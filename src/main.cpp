@@ -44,28 +44,38 @@ void displayShow(String text) {
 void motorenStopp() {
   digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
+  ledcWrite(PWM_KANAL_A, 0);
+  ledcWrite(PWM_KANAL_B, 0);
 }
 
 void vorwaerts() {
   digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
   digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+  ledcWrite(PWM_KANAL_A, FAHRGESCHWINDIGKEIT-MOTOR_OFFSET); // um Kurvenfahrt zu vermeiden
+  ledcWrite(PWM_KANAL_B, FAHRGESCHWINDIGKEIT);
 }
 
 void rueckwaerts() {
   digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
   digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH);
+  ledcWrite(PWM_KANAL_A, FAHRGESCHWINDIGKEIT-MOTOR_OFFSET); // um Kurvenfahrt zu vermeiden
+  ledcWrite(PWM_KANAL_B, FAHRGESCHWINDIGKEIT);
 }
 
 // Rechtsdrehung: Motor A vorwärts, Motor B rückwärts
 void dreheRechts() {
   digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH);
+  ledcWrite(PWM_KANAL_A, DREHGESCHWINDIGKEIT);
+  ledcWrite(PWM_KANAL_B, DREHGESCHWINDIGKEIT);
 }
 
 // Linksdrehung: Motor A rückwärts, Motor B vorwärts
 void dreheLinks() {
   digitalWrite(IN1, LOW);  digitalWrite(IN2, HIGH);
   digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+  ledcWrite(PWM_KANAL_A, DREHGESCHWINDIGKEIT);
+  ledcWrite(PWM_KANAL_B, DREHGESCHWINDIGKEIT);
 }
 
 // ============================================================
@@ -138,9 +148,15 @@ void setup() {
   
   displayShow("Initialisierung");
 
-  // Nur Richtungspins nötig – kein ledcSetup!
+  // Richtungspins
   pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
+
+  // PWM-Kanäle einrichten (ESP32 LEDC)
+  ledcSetup(PWM_KANAL_A, PWM_FREQ, PWM_AUFLOES);
+  ledcSetup(PWM_KANAL_B, PWM_FREQ, PWM_AUFLOES);
+  ledcAttachPin(ENA, PWM_KANAL_A);
+  ledcAttachPin(ENB, PWM_KANAL_B);
 
   motorenStopp();
   delay(2000);
