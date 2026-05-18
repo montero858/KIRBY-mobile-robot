@@ -11,11 +11,22 @@
 #define IN2  27   // Motor A Richtung
 #define IN3  14   // Motor B Richtung
 #define IN4  12   // Motor B Richtung
-// ENA / ENB: Jumper auf L298N gesetzt, keine Pin-Definition nötig
+
+// --- L298N PWM-Pins (ENA / ENB Jumper entfernen!) ---
+#define ENA  18   // Motor A Geschwindigkeit
+#define ENB  19   // Motor B Geschwindigkeit
+ 
+// --- PWM-Konfiguration (ESP32 LEDC) ---
+#define PWM_KANAL_A   0     // LEDC-Kanal Motor A
+#define PWM_KANAL_B   1     // LEDC-Kanal Motor B
+#define PWM_FREQ      1000  // Hz
+#define PWM_AUFLOES   8     // Bit → Wertebereich 0–255
+
 
 // --- HC-SR04 Ultraschallsensor ---
 #define TRIG  5
 #define ECHO  4
+
 
 // --- Display (SSD1306 I2C) ---
 #define SCREEN_WIDTH 128
@@ -28,7 +39,11 @@
 
 // --- Fahrverhalten ---
 #define HINDERNIS_ABSTAND_CM  25   // Stopp wenn < 25 cm
+#define FAHRGESCHWINDIGKEIT   250  // Vorwärts/Rückwärts (0–255)
+#define DREHGESCHWINDIGKEIT   250  // Beim Scannen/Drehen (0–255)
 #define DREH_DAUER_MS         350  // Drehzeit beim Scannen (ms)
 #define SCAN_PAUSE_MS         300  // Pause zwischen Messungen (ms)
+
+#define MOTOR_OFFSET          10   // PWM-Offset um Kurvenfahrt zu vermeiden
 
 #endif // CONFIG_H
