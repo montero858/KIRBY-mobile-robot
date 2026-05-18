@@ -1,32 +1,14 @@
-#include <Arduino.h>
-#include "SR04.h"
-
 // ============================================================
 //  Selbstfahrender Roboter – OHNE PWM (Jumper auf ENA/ENB)
 //  Hardware: ESP32 + L298N + HC-SR04 + 2x DC-Motor
 //  ENA und ENB Jumper auf L298N aufgesteckt lassen!
 // ============================================================
+#include <Arduino.h>
+#include "SR04.h"
+#include "config.h"   // Pin-Belegung und Einstellungen
 
-// --- Pin-Definitionen ---
-// L298N Steuerpins (nur Richtung, kein PWM)
-const int IN1 = 26;   // Motor A Richtung
-const int IN2 = 27;   // Motor A Richtung
-const int IN3 = 14;   // Motor B Richtung
-const int IN4 = 12;   // Motor B Richtung
-// ENA und ENB werden NICHT verwendet – Jumper übernehmen das!
-
-// HC-SR04 Ultraschallsensor
-#define TRIG_PIN 5
-#define ECHO_PIN 4
-
-SR04 sr04 = SR04(ECHO_PIN, TRIG_PIN);
-
+SR04 sr04 = SR04(ECHO, TRIG);
 long a;
-
-// --- Einstellungen ---
-const int HINDERNIS_ABSTAND_CM = 25;  // Stopp wenn < 25 cm
-const int DREH_DAUER_MS        = 500; // Wie weit rechts/links gedreht wird
-const int SCAN_PAUSE_MS        = 300; // Pause zwischen Messungen
 
 // ============================================================
 //  Motorsteuerung – nur Richtung, kein PWM
