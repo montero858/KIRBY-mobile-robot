@@ -22,20 +22,18 @@
 #define PWM_FREQ      1000  // Hz
 #define PWM_AUFLOES   8     // Bit → Wertebereich 0–255
 
-
 // --- HC-SR04 Ultraschallsensor ---
 #define TRIG  5
 #define ECHO  4
-
 
 // --- Display (SSD1306 I2C) ---
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 // Define OLED I2C address (default is usually 0x3C or 0x3D)
+#define OLED_RESET -1
 #define OLED_ADDR   0x3C
 #define PIN_SCL     21
 #define PIN_SDA     22
-
 
 // --- Fahrverhalten ---
 #define HINDERNIS_ABSTAND_CM  25   // Stopp wenn < 25 cm
@@ -44,6 +42,14 @@
 #define DREH_DAUER_MS         350  // Drehzeit beim Scannen (ms)
 #define SCAN_PAUSE_MS         300  // Pause zwischen Messungen (ms)
 
-#define MOTOR_OFFSET          10   // PWM-Offset um Kurvenfahrt zu vermeiden
+// --- WLAN Access Point ---
+#define WLAN_SSID      "HENRY"                 // WLAN-Name (sichtbar am Smartphone)
+#define WLAN_PASSWORT  "henry140918"           // Mindestens 8 Zeichen!
+#define WLAN_KANAL        1                    // WLAN-Kanal (1-13)
+#define WLAN_SSID_HIDDEN  false                // true = SSID sichtbar
+#define WLAN_MAX_CLIENTS  1                    // Nur 1 Geraet gleichzeitig
+
+// --- IP-Whitelist ---
+#define ERLAUBTE_IP  "192.168.4.2"   // Erste Verbindung bekommt immer diese IP
 
 #endif // CONFIG_H
