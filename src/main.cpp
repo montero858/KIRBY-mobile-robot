@@ -3,12 +3,39 @@
 //  Hardware: ESP32 + L298N + HC-SR04 + 2x DC-Motor
 //  ENA und ENB Jumper auf L298N aufgesteckt lassen!
 // ============================================================
-#include <Arduino.h>
-#include "SR04.h"
-#include "config.h"   // Pin-Belegung und Einstellungen
+
+// Pin-Belegung und Einstellungen
+#include "config.h"
+
+// Für Ultrasonic Sensor
+#include "SR04.h"   
+
+// Für Display
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 SR04 sr04 = SR04(ECHO, TRIG);
 long a;
+
+#define OLED_RESET -1
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+
+// ============================================================
+//  Display-Anzeige 
+// ============================================================
+
+void displayShow(String text) {
+  Serial.println(text);
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 10);
+  display.print(text.c_str());
+  display.display();
+}
 
 // ============================================================
 //  Motorsteuerung – nur Richtung, kein PWM
@@ -48,7 +75,7 @@ void dreheLinks() {
 
 char scanneBesteDrehrichtung() {
   // Nach rechts drehen und messen
-  Serial.println("  → Scanne RECHTS...");
+  displayShow("Scanne rechts...");
   dreheRechts();
   delay(DREH_DAUER_MS);
   motorenStopp();
@@ -66,7 +93,7 @@ char scanneBesteDrehrichtung() {
   delay(SCAN_PAUSE_MS);
 
   // Nach links drehen und messen
-  Serial.println("  → Scanne LINKS...");
+  displayShow("Scanne links...");
   dreheLinks();
   delay(DREH_DAUER_MS);
   motorenStopp();
@@ -103,7 +130,13 @@ char scanneBesteDrehrichtung() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("=== Roboter startet (ohne PWM) ===");
+  Wire.begin(PIN_SDA, PIN_SCL); // SDA=21, SCL=22
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;);
+  }
+  
+  displayShow("Initialisierung");
 
   // Nur Richtungspins nötig – kein ledcSetup!
   pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
@@ -111,7 +144,6 @@ void setup() {
 
   motorenStopp();
   delay(2000);
-  Serial.println("=== Los! ===");
 }
 
 // ============================================================
@@ -127,11 +159,12 @@ void loop() {
 
   if (abstand > HINDERNIS_ABSTAND_CM || abstand == 999) {
     // Freie Bahn → vorwärts
+    displayShow("Fahre los");
     vorwaerts();
 
   } else {
     // Hindernis erkannt!
-    Serial.println("⚠ Hindernis! Stoppe...");
+    displayShow("Hindernis erkannt!");
     motorenStopp();
     delay(400);
 
