@@ -30,6 +30,7 @@ const char HTML_SEITE[] = R"rawliteral(
   .btn:active { opacity: .75; }
   #btn-start    { background: #1D9E75; color: #fff; }
   #btn-stop     { background: #444;    color: #eee; }
+  #btn-scan     { background: #378ADD; color: #fff; }
   /* Parameter-Eingabe */
   .param-box { background: #1e1e1e; border-radius: 12px;
                padding: 16px 20px; width: 100%; max-width: 340px; }
@@ -42,14 +43,15 @@ const char HTML_SEITE[] = R"rawliteral(
                                    border-radius: 6px; color: #eee; font-size: 13px;
                                    padding: 4px 8px; text-align: right; }
   #btn-param { background: #333; color: #aaa; font-size: 14px; padding: 12px; }
+  /* Geschwindigkeitsstufen */
   .speed-box { background: #1e1e1e; border-radius: 12px;
-              padding: 16px 20px; width: 100%; max-width: 340px; }
-  .speed-label { display: flex; justify-content: space-between;
-                font-size: 13px; color: #aaa; margin-bottom: 10px; }
-  .speed-label span { font-size: 13px; color: #eee; font-weight: 500; }
-  .speed-row { display: flex; align-items: center; gap: 10px; }
-  .speed-row small { font-size: 11px; color: #555; min-width: 24px; text-align: center; }
-  input[type=range] { flex: 1; accent-color: #1D9E75; }
+               padding: 16px 20px; width: 100%; max-width: 340px; }
+  .speed-box h2 { font-size: 13px; font-weight: 500; color: #aaa; margin-bottom: 12px; }
+  .speed-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .speed-btn { padding: 14px 0; border: none; border-radius: 8px; font-size: 16px;
+               font-weight: 600; cursor: pointer; background: #2a2a2a; color: #666;
+               transition: all .15s; }
+  .speed-btn.aktiv { background: #1D9E75; color: #fff; }
 </style>
 </head>
 <body>
@@ -63,17 +65,22 @@ const char HTML_SEITE[] = R"rawliteral(
 
 <button class="btn" id="btn-start" onclick="sende('/start')">▶ Start</button>
 <button class="btn" id="btn-stop"  onclick="sende('/stopp')">⏹ Stopp</button>
+<button class="btn" id="btn-scan"  onclick="sende('/scan')">⟳ Neu scannen</button>
 
 <!-- Parameter-Eingabe -->
 <div class="param-box">
   <h2>Abstimmung</h2>
+  <div class="param-row">
+    <label>Front Slow (cm)</label>
+    <input type="number" id="p-fs" min="1" max="400" value="100">
+  </div>
   <div class="param-row">
     <label>Front Limit (cm)</label>
     <input type="number" id="p-fl" min="1" max="400" value="40">
   </div>
   <div class="param-row">
     <label>Front Stop (cm)</label>
-    <input type="number" id="p-fs" min="1" max="400" value="15">
+    <input type="number" id="p-fp" min="1" max="400" value="15">
   </div>
   <div class="param-row">
     <label>Seite Limit (cm)</label>
@@ -94,14 +101,12 @@ const char HTML_SEITE[] = R"rawliteral(
 </div>
 <button class="btn" id="btn-param" onclick="parameterSenden()">↺ Parameter übernehmen</button>
 <div class="speed-box">
-  <div class="speed-label">
-    <span>Geschwindigkeit</span>
-    <span id="geschwindigkeit-wert">0</span>
-  </div>
-  <div class="speed-row">
-    <input type="range" id="geschwindigkeit" min="0" max="255" value="122"
-           oninput="geschwindigkeitAktualisieren(this.value)"
-           onchange="geschwindigkeitSenden(this.value)">
+  <h2>Geschwindigkeitsstufe</h2>
+  <div class="speed-btns">
+    <button class="speed-btn aktiv" id="s1" onclick="setzeStufe(1)">1</button>
+    <button class="speed-btn"       id="s2" onclick="setzeStufe(2)">2</button>
+    <button class="speed-btn"       id="s3" onclick="setzeStufe(3)">3</button>
+    <button class="speed-btn"       id="s4" onclick="setzeStufe(4)">4</button>
   </div>
 </div>
 
@@ -116,33 +121,33 @@ async function sende(pfad) {
   }
 }
 
-// Wert live anzeigen waehrend Regler bewegt wird
-function geschwindigkeitAktualisieren(wert) {
-  document.getElementById('geschwindigkeit-wert').textContent = wert;
-}
-
-// Wert erst senden wenn Finger losgelassen wird (onchange)
-async function geschwindigkeitSenden(wert) {
+async function setzeStufe(stufe) {
   try {
-    await fetch('/geschwindigkeit?wert=' + wert);
+    await fetch('/stufe?wert=' + stufe);
+    // Aktiven Button hervorheben
+    for (let i = 1; i <= 4; i++) {
+      document.getElementById('s' + i).classList.toggle('aktiv', i === stufe);
+    }
+    document.getElementById('status').textContent = 'Stufe ' + stufe + ' aktiv';
   } catch(e) {
-    document.getElementById('status').textContent = 'Geschwindigkeit-Fehler: ' + e;
+    document.getElementById('status').textContent = 'Fehler: ' + e;
   }
 }
 
 async function parameterSenden() {
-  const fl = document.getElementById('p-fl').value;
   const fs = document.getElementById('p-fs').value;
+  const fl = document.getElementById('p-fl').value;
+  const fp = document.getElementById('p-fp').value;
   const sl = document.getElementById('p-sl').value;
   const ss = document.getElementById('p-ss').value;
   const dg = document.getElementById('p-dg').value;
   const kp = document.getElementById('p-kp').value;
   try {
-    const r = await fetch(`/parameter?fl=${fl}&fs=${fs}&sl=${sl}&ss=${ss}&dg=${dg}&kp=${kp}`);
+    const r = await fetch(`/parameter?fs=${fs}&fl=${fl}&fp=${fp}&sl=${sl}&ss=${ss}&dg=${dg}&kp=${kp}`);
     const json = await r.json();
-    // Felder mit bestaetigen Werten vom ESP32 aktualisieren
-    document.getElementById('p-fl').value = json.fl;
     document.getElementById('p-fs').value = json.fs;
+    document.getElementById('p-fl').value = json.fl;
+    document.getElementById('p-fp').value = json.fp;
     document.getElementById('p-sl').value = json.sl;
     document.getElementById('p-ss').value = json.ss;
     document.getElementById('p-dg').value = json.dg;
@@ -158,8 +163,9 @@ window.addEventListener('load', async () => {
   try {
     const r = await fetch('/parameter');
     const json = await r.json();
-    document.getElementById('p-fl').value = json.fl;
     document.getElementById('p-fs').value = json.fs;
+    document.getElementById('p-fl').value = json.fl;
+    document.getElementById('p-fp').value = json.fp;
     document.getElementById('p-sl').value = json.sl;
     document.getElementById('p-ss').value = json.ss;
     document.getElementById('p-dg').value = json.dg;

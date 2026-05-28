@@ -35,16 +35,20 @@ WebServer server(80);
 // --- Roboter-Zustand ---
 bool roboterAktiv = false;
 
-// --- Geschwindigkeit (per Web einstellbar) ---
-int geschwindigkeit      = FAHRGESCHWINDIGKEIT;
+// --- Geschwindigkeit ---
+// maxGeschwindigkeit: per Stufen-Button gewaehlt (120/165/210/255)
+// geschwindigkeit:    aktuelle Fahrgeschwindigkeit (adaptiv angepasst)
+int maxGeschwindigkeit = 120;
+int geschwindigkeit    = 120;
 
 // --- Abstimmbare Parameter (per Web einstellbar) ---
-int schwelleFrontLimit   = SCHWELLE_FRONT_LIMIT_DEFAULT;
-int schwelleFrontStop    = SCHWELLE_FRONT_STOP_DEFAULT;
-int schwelleSeiteLimit   = SCHWELLE_SEITE_LIMIT_DEFAULT;
-int schwelleSeiteStop    = SCHWELLE_SEITE_STOP_DEFAULT;
-int drehgeschwindigkeit  = DREHGESCHWINDIGKEIT_DEFAULT;
-int kurveInnenProzent    = KURVE_INNEN_PROZENT_DEFAULT;
+int schwelleFrontSlow  = SCHWELLE_FRONT_SLOW_DEFAULT;
+int schwelleFrontLimit = SCHWELLE_FRONT_LIMIT_DEFAULT;
+int schwelleFrontStop  = SCHWELLE_FRONT_STOP_DEFAULT;
+int schwelleSeiteLimit = SCHWELLE_SEITE_LIMIT_DEFAULT;
+int schwelleSeiteStop  = SCHWELLE_SEITE_STOP_DEFAULT;
+int drehgeschwindigkeit = DREHGESCHWINDIGKEIT_DEFAULT;
+int kurveInnenProzent   = KURVE_INNEN_PROZENT_DEFAULT;
 
 // --- Gecachte Sensorwerte (fuer handleAbstand ohne neue Messung) ---
 int cachedAbstandM = 999;
@@ -55,6 +59,30 @@ int cachedAbstandL = 999;
 // Moegliche Werte: 'F'=vorwaerts, 'L'=kurveLinks, 'R'=kurveRechts,
 //                 'S'=stopp, 'U'=rueckwaerts, 'D'=drehen (scan)
 char letzterFahrzustand = 'S';
+
+// ============================================================
+//  Adaptive Geschwindigkeitsberechnung
+//  Zwischen SLOW und LIMIT wird linear von maxGeschwindigkeit
+//  auf MIN_GESCHWINDIGKEIT (120) reduziert
+// ============================================================
+
+const int MIN_GESCHWINDIGKEIT = 120;
+
+int berechneGeschwindigkeit(int abstandM) {
+  // Oberhalb SLOW-Schwelle: volle Geschwindigkeit
+  if (abstandM >= schwelleFrontSlow) return maxGeschwindigkeit;
+
+  // Unterhalb LIMIT-Schwelle: Mindestgeschwindigkeit
+  // (STOP-Logik greift vorher, aber zur Sicherheit)
+  if (abstandM <= schwelleFrontLimit) return MIN_GESCHWINDIGKEIT;
+
+  // Lineare Interpolation zwischen SLOW und LIMIT
+  // v = MIN + (max - MIN) * (abstand - LIMIT) / (SLOW - LIMIT)
+  int bereich = schwelleFrontSlow - schwelleFrontLimit;
+  int anteil  = abstandM - schwelleFrontLimit;
+  return MIN_GESCHWINDIGKEIT +
+         (maxGeschwindigkeit - MIN_GESCHWINDIGKEIT) * anteil / bereich;
+}
 
 // ============================================================
 //  Display
@@ -140,22 +168,13 @@ void kurveRechts() { setzeKurve('R'); }
 void kurveLinks()  { setzeKurve('L'); }
 
 // ============================================================
-//  Ultraschallmessung – Mittelwert, mit Fehlerbehandlung
+//  Ultraschallmessung
 // ============================================================
 
 int messeAbstand(SR04 &sensor) {
   int a = sensor.Distance();
-  delay(15);
-  int b = sensor.Distance();
-
-  // Einzelne ungueltige Werte durch den anderen ersetzen
-  bool aUngueltig = (a <= 0 || a > 400);
-  bool bUngueltig = (b <= 0 || b > 400);
-
-  if (aUngueltig && bUngueltig) return 999;  // beide ungueltig -> kein Hindernis
-  if (aUngueltig) return b;
-  if (bUngueltig) return a;
-  return (a + b) / 2;
+  if (a <= 0 || a > 400) return 999;
+  return a;
 }
 
 // Alle drei Sensoren sequenziell auslesen und Cache aktualisieren
@@ -257,6 +276,15 @@ void handleStopp() {
   server.send(200, "text/plain", "Gestoppt");
 }
 
+void handleScan() {
+  // Sofort antworten – Scan laeuft danach in loop()
+  server.send(200, "text/plain", "Scan gestartet...");
+  motorenStopp();
+  delay(300);
+  scanneUndDrehe();
+  // roboterAktiv bleibt true -> loop() faehrt danach weiter
+}
+
 void handleAbstand() {
   // Gecachte Werte aus letztem Loop-Durchlauf senden – keine neue Messung
   String antwort = "M:" + String(cachedAbstandM) +
@@ -265,12 +293,19 @@ void handleAbstand() {
   server.send(200, "text/plain", antwort);
 }
 
-void handleGeschwindigkeit() {
+void handleStufe() {
   if (server.hasArg("wert")) {
-    int wert = server.arg("wert").toInt();
-    geschwindigkeit = constrain(wert, 0, 255);
+    int stufe = server.arg("wert").toInt();
+    switch (stufe) {
+      case 1: maxGeschwindigkeit = 120; break;
+      case 2: maxGeschwindigkeit = 165; break;
+      case 3: maxGeschwindigkeit = 210; break;
+      case 4: maxGeschwindigkeit = 255; break;
+      default: server.send(400, "text/plain", "Ungueltige Stufe"); return;
+    }
     letzterFahrzustand = 'S';
-    Serial.print("[WEB] Speed: "); Serial.println(geschwindigkeit);
+    Serial.print("[WEB] Stufe: "); Serial.print(stufe);
+    Serial.print(" -> max: "); Serial.println(maxGeschwindigkeit);
     server.send(200, "text/plain", "OK");
   } else {
     server.send(400, "text/plain", "Kein Wert");
@@ -278,22 +313,22 @@ void handleGeschwindigkeit() {
 }
 
 void handleParameter() {
-  // Jeden Parameter nur setzen wenn er in der Anfrage enthalten ist
+  if (server.hasArg("fs"))  schwelleFrontSlow   = constrain(server.arg("fs").toInt(),  1, 400);
   if (server.hasArg("fl"))  schwelleFrontLimit  = constrain(server.arg("fl").toInt(),  1, 400);
-  if (server.hasArg("fs"))  schwelleFrontStop   = constrain(server.arg("fs").toInt(),  1, 400);
+  if (server.hasArg("fp"))  schwelleFrontStop   = constrain(server.arg("fp").toInt(),  1, 400);
   if (server.hasArg("sl"))  schwelleSeiteLimit  = constrain(server.arg("sl").toInt(),  1, 400);
   if (server.hasArg("ss"))  schwelleSeiteStop   = constrain(server.arg("ss").toInt(),  1, 400);
   if (server.hasArg("dg"))  drehgeschwindigkeit = constrain(server.arg("dg").toInt(),  0, 255);
   if (server.hasArg("kp"))  kurveInnenProzent   = constrain(server.arg("kp").toInt(),  0, 100);
 
-  // Aktuelle Werte als JSON zuruecksenden damit Web-Interface Bestaetigung hat
   String json = "{";
-  json += "\"fl\":"  + String(schwelleFrontLimit)  + ",";
-  json += "\"fs\":"  + String(schwelleFrontStop)   + ",";
-  json += "\"sl\":"  + String(schwelleSeiteLimit)  + ",";
-  json += "\"ss\":"  + String(schwelleSeiteStop)   + ",";
-  json += "\"dg\":"  + String(drehgeschwindigkeit) + ",";
-  json += "\"kp\":"  + String(kurveInnenProzent);
+  json += "\"fs\":" + String(schwelleFrontSlow)   + ",";
+  json += "\"fl\":" + String(schwelleFrontLimit)  + ",";
+  json += "\"fp\":" + String(schwelleFrontStop)   + ",";
+  json += "\"sl\":" + String(schwelleSeiteLimit)  + ",";
+  json += "\"ss\":" + String(schwelleSeiteStop)   + ",";
+  json += "\"dg\":" + String(drehgeschwindigkeit) + ",";
+  json += "\"kp\":" + String(kurveInnenProzent);
   json += "}";
 
   Serial.println("[WEB] Parameter: " + json);
@@ -331,8 +366,9 @@ void setup() {
   server.on("/",                handleRoot);
   server.on("/start",           handleStart);
   server.on("/stopp",           handleStopp);
+  server.on("/scan",            handleScan);
   server.on("/abstand",         handleAbstand);
-  server.on("/geschwindigkeit", handleGeschwindigkeit);
+  server.on("/stufe",           handleStufe);
   server.on("/parameter",       handleParameter);
   server.begin();
 }
@@ -351,6 +387,9 @@ void loop() {
   Serial.print("M:"); Serial.print(cachedAbstandM);
   Serial.print(" R:"); Serial.print(cachedAbstandR);
   Serial.print(" L:"); Serial.println(cachedAbstandL);
+
+  // Adaptive Geschwindigkeit berechnen
+  geschwindigkeit = berechneGeschwindigkeit(cachedAbstandM);
 
   // ── Prioritaet 1: STOP-Schwelle – sofort anhalten und scannen ──
   if (cachedAbstandM < schwelleFrontStop ||
