@@ -1,18 +1,23 @@
 // ============================================================
-//  KIRBY – Selbstfahrender Roboter
-//  Hardware: ESP32 + L298N + 3x HC-SR04 + Display
+//  KIRBY - Selbstfahrender Roboter
+//  Hardware: ESP32 + L298N + 1x HC-SR04 (auf SG90-Servo)
+//            + 7x IR-Sensoren + SSD1306 Display
 //  Steuerung: Browser unter http://192.168.4.1
 //
-//  Sensoranordnung:
-//    [SR04-L]  [SR04-M]  [SR04-R]
-//    leicht    gerade    leicht
-//    links           rechts gedreht
+//  Sensor-Layout:
+//    IR vorne mitte/links/rechts   : Hindernis (binaer)
+//    IR vorne links/rechts         : Boden (Absturz)
+//    IR hinten links/rechts        : Boden (Absturz)
+//    HC-SR04 auf Servo, vorne mitte: Abstand (schwenkbar)
 //
-//  Fahrlogik (Prioritaet hoch -> niedrig):
-//    1. Irgendein Sensor < STOP-Schwelle  -> Stopp + Scan
-//    2. Seitensensor < LIMIT-Schwelle     -> Gegenlenken
-//    3. Frontsensor  < LIMIT-Schwelle     -> Kurve zur freieren Seite
-//    4. Alles frei                        -> Geradeaus
+//  Prioritaeten (hoch -> niedrig):
+//    1. Boden vorne UND hinten gleichzeitig -> Notstopp
+//    2. Boden vorne   -> zurueck, 90 Grad drehen, weiterfahren
+//    3. Boden hinten  -> langsam vorwaerts
+//    4. IR-Hindernis schraeg vorne -> Stopp + Servo-Scan + Drehen
+//    5. Ultraschall STOP-Schwelle  -> Stopp + Servo-Scan + Drehen
+//    6. Ultraschall SLOW-Schwelle  -> Geschwindigkeit reduzieren
+//    7. Frei -> Geradeausfahrt
 // ============================================================
 
 #include "config.h"
@@ -24,10 +29,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-// --- Drei Ultraschallsensoren ---
-SR04 sensorM = SR04(ECHO_M, TRIG_M);
-SR04 sensorR = SR04(ECHO_R, TRIG_R);
-SR04 sensorL = SR04(ECHO_L, TRIG_L);
+SR04 sensor = SR04(ECHO, TRIG);
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 WebServer server(80);
@@ -36,53 +38,19 @@ WebServer server(80);
 bool roboterAktiv = false;
 
 // --- Geschwindigkeit ---
-// maxGeschwindigkeit: per Stufen-Button gewaehlt (120/165/210/255)
-// geschwindigkeit:    aktuelle Fahrgeschwindigkeit (adaptiv angepasst)
-int maxGeschwindigkeit = 120;
-int geschwindigkeit    = 120;
+int maxGeschwindigkeit = FAHRGESCHWINDIGKEIT;   // per Stufen-Button
+int geschwindigkeit    = FAHRGESCHWINDIGKEIT;   // aktuell berechnet
 
-// --- Abstimmbare Parameter (per Web einstellbar) ---
-int schwelleFrontSlow  = SCHWELLE_FRONT_SLOW_DEFAULT;
-int schwelleFrontLimit = SCHWELLE_FRONT_LIMIT_DEFAULT;
-int schwelleFrontStop  = SCHWELLE_FRONT_STOP_DEFAULT;
-int schwelleSeiteLimit = SCHWELLE_SEITE_LIMIT_DEFAULT;
-int schwelleSeiteStop  = SCHWELLE_SEITE_STOP_DEFAULT;
+// --- Per Web abstimmbare Parameter ---
+int schwelleFrontSlow   = SCHWELLE_FRONT_SLOW_DEFAULT;
+int schwelleFrontStop   = SCHWELLE_FRONT_STOP_DEFAULT;
 int drehgeschwindigkeit = DREHGESCHWINDIGKEIT_DEFAULT;
-int kurveInnenProzent   = KURVE_INNEN_PROZENT_DEFAULT;
 
-// --- Gecachte Sensorwerte (fuer handleAbstand ohne neue Messung) ---
-int cachedAbstandM = 999;
-int cachedAbstandR = 999;
-int cachedAbstandL = 999;
-
-// --- Letzter Fahrzustand (verhindert redundante Motor-Writes) ---
-// Moegliche Werte: 'F'=vorwaerts, 'L'=kurveLinks, 'R'=kurveRechts,
-//                 'S'=stopp, 'U'=rueckwaerts, 'D'=drehen (scan)
-char letzterFahrzustand = 'S';
-
-// ============================================================
-//  Adaptive Geschwindigkeitsberechnung
-//  Zwischen SLOW und LIMIT wird linear von maxGeschwindigkeit
-//  auf MIN_GESCHWINDIGKEIT (120) reduziert
-// ============================================================
-
-const int MIN_GESCHWINDIGKEIT = 120;
-
-int berechneGeschwindigkeit(int abstandM) {
-  // Oberhalb SLOW-Schwelle: volle Geschwindigkeit
-  if (abstandM >= schwelleFrontSlow) return maxGeschwindigkeit;
-
-  // Unterhalb LIMIT-Schwelle: Mindestgeschwindigkeit
-  // (STOP-Logik greift vorher, aber zur Sicherheit)
-  if (abstandM <= schwelleFrontLimit) return MIN_GESCHWINDIGKEIT;
-
-  // Lineare Interpolation zwischen SLOW und LIMIT
-  // v = MIN + (max - MIN) * (abstand - LIMIT) / (SLOW - LIMIT)
-  int bereich = schwelleFrontSlow - schwelleFrontLimit;
-  int anteil  = abstandM - schwelleFrontLimit;
-  return MIN_GESCHWINDIGKEIT +
-         (maxGeschwindigkeit - MIN_GESCHWINDIGKEIT) * anteil / bereich;
-}
+// --- Letzter Motor-Zustand (verhindert redundante Schreibzugriffe) ---
+int  letzterPwmA    = -1;
+int  letzterPwmB    = -1;
+bool letzterRueckwA = false;
+bool letzterRueckwB = false;
 
 // ============================================================
 //  Display
@@ -103,154 +71,227 @@ void displayShow(String text) {
 }
 
 // ============================================================
-//  Motorsteuerung – mit Zustandsmerker
+//  Servo-Steuerung
+//  Manuell per LEDC (kein zusaetzliches Servo.h noetig) -
+//  konsistent mit der bestehenden PWM-Ansteuerung der Motoren.
 // ============================================================
 
-// Gemeinsame PWM-Hilfsfunktion
-void setzePWM(int pwmA, int pwmB) {
+void servoSchreibeWinkel(int winkel) {
+  winkel = constrain(winkel, 0, 180);
+  // Standard-Servo: 1000us (0 Grad) bis 2000us (180 Grad) bei 20ms Periode
+  int pulsbreiteUs = 1000 + (winkel * 1000) / 180;
+  int duty = (pulsbreiteUs * 65536) / 20000;   // 16-Bit Aufloesung, 20ms Periode
+  ledcWrite(PWM_KANAL_SERVO, duty);
+}
+
+// ============================================================
+//  Motorsteuerung (L298N)
+// ============================================================
+
+void setzeMotoren(int pwmA, int pwmB, bool ruckwA = false, bool ruckwB = false) {
+  // Nur schreiben wenn sich der Zustand wirklich geaendert hat
+  if (pwmA == letzterPwmA && pwmB == letzterPwmB &&
+      ruckwA == letzterRueckwA && ruckwB == letzterRueckwB) return;
+
+  letzterPwmA    = pwmA;
+  letzterPwmB    = pwmB;
+  letzterRueckwA = ruckwA;
+  letzterRueckwB = ruckwB;
+
+  if      (pwmA == 0) { digitalWrite(IN1, LOW);  digitalWrite(IN2, LOW);  }
+  else if (ruckwA)    { digitalWrite(IN1, LOW);  digitalWrite(IN2, HIGH); }
+  else                 { digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);  }
+
+  if      (pwmB == 0) { digitalWrite(IN3, LOW);  digitalWrite(IN4, LOW);  }
+  else if (ruckwB)    { digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH); }
+  else                 { digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);  }
+
   ledcWrite(PWM_KANAL_A, pwmA);
   ledcWrite(PWM_KANAL_B, pwmB);
 }
 
-void motorenStopp() {
-  if (letzterFahrzustand == 'S') return;
-  letzterFahrzustand = 'S';
-  digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
-  digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
-  setzePWM(0, 0);
-}
-
-void vorwaerts() {
-  if (letzterFahrzustand == 'F') return;
-  letzterFahrzustand = 'F';
-  digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
-  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
-  setzePWM(geschwindigkeit, geschwindigkeit);
-}
-
-void rueckwaerts() {
-  if (letzterFahrzustand == 'U') return;
-  letzterFahrzustand = 'U';
-  digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
-  digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH);
-  setzePWM(geschwindigkeit, geschwindigkeit);
-}
-
-void dreheRechts() {
-  letzterFahrzustand = 'D';
-  digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
-  digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH);
-  setzePWM(drehgeschwindigkeit, drehgeschwindigkeit);
-}
-
-void dreheLinks() {
-  letzterFahrzustand = 'D';
-  digitalWrite(IN1, LOW);  digitalWrite(IN2, HIGH);
-  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
-  setzePWM(drehgeschwindigkeit, drehgeschwindigkeit);
-}
-
-// Gemeinsame Kurven-Hilfsfunktion
-void setzeKurve(char seite) {
-  if (letzterFahrzustand == seite) return;
-  letzterFahrzustand = seite;
-  int pwmInnen = (geschwindigkeit * kurveInnenProzent) / 100;
-  digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
-  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
-  if (seite == 'R') {
-    setzePWM(geschwindigkeit, pwmInnen);  // links aussen, rechts innen
-  } else {
-    setzePWM(pwmInnen, geschwindigkeit);  // links innen, rechts aussen
-  }
-}
-
-void kurveRechts() { setzeKurve('R'); }
-void kurveLinks()  { setzeKurve('L'); }
+void motorenStopp()     { setzeMotoren(0, 0); }
+void vorwaerts(int v)   { setzeMotoren(v, v, false, false); }
+void rueckwaerts(int v) { setzeMotoren(v, v, true,  true);  }
+void dreheRechts(int v) { setzeMotoren(v, v, false, true);  }
+void dreheLinks(int v)  { setzeMotoren(v, v, true,  false); }
 
 // ============================================================
-//  Ultraschallmessung
+//  Ultraschallmessung - Mittelwert mit Fehlerbehandlung
 // ============================================================
 
-int messeAbstand(SR04 &sensor) {
+int messeAbstand() {
   int a = sensor.Distance();
-  if (a <= 0 || a > 400) return 999;
-  return a;
-}
-
-// Alle drei Sensoren sequenziell auslesen und Cache aktualisieren
-void aktualisiereAbstaende() {
-  cachedAbstandM = messeAbstand(sensorM);
   delay(SENSOR_DELAY_MS);
-  cachedAbstandR = messeAbstand(sensorR);
-  delay(SENSOR_DELAY_MS);
-  cachedAbstandL = messeAbstand(sensorL);
-  delay(SENSOR_DELAY_MS);
+  int b = sensor.Distance();
+  bool aUng = (a <= 0 || a > 400);
+  bool bUng = (b <= 0 || b > 400);
+  if (aUng && bUng) return 999;
+  if (aUng) return b;
+  if (bUng) return a;
+  return (a + b) / 2;
 }
 
 // ============================================================
-//  Scan: Physisch drehen und freie Richtung suchen
-//  Wird nur bei STOP-Schwelle aufgerufen
+//  IR-Sensoren auslesen
 // ============================================================
 
+// Entstoerte Messung: zwei Lesungen muessen uebereinstimmen,
+// bevor ein sicherheitsrelevanter Trigger ausgeloest wird
+bool irErkannt(int pin) {
+  bool erste = (digitalRead(pin) == IR_PEGEL_ERKANNT);
+  delayMicroseconds(500);
+  bool zweite = (digitalRead(pin) == IR_PEGEL_ERKANNT);
+  return erste && zweite;
+}
+
+// ============================================================
+//  Adaptive Geschwindigkeit
+//  Linear von maxGeschwindigkeit -> MIN_GESCHWINDIGKEIT
+//  zwischen SLOW- und STOP-Schwelle
+// ============================================================
+
+/*
+int berechneGeschwindigkeit(int abstand) {
+  if (abstand >= schwelleFrontSlow) return maxGeschwindigkeit;
+  if (abstand <= schwelleFrontStop) return MIN_GESCHWINDIGKEIT;
+  int bereich = schwelleFrontSlow - schwelleFrontStop;
+  int anteil  = abstand - schwelleFrontStop;
+  return MIN_GESCHWINDIGKEIT +
+         (maxGeschwindigkeit - MIN_GESCHWINDIGKEIT) * anteil / bereich;
+}
+*/
+
+// ============================================================
+//  Servo-Scan: Kopf nach rechts/links schwenken und messen,
+//  zurueck zur Mitte, dann Roboter in freiere Richtung drehen.
+//  Der Servo uebernimmt das Messen, der Roboter dreht erst
+//  danach physisch in die ermittelte Richtung.
+// ============================================================
 void scanneUndDrehe() {
-  // --- Scan rechts ---
+  int delayfactor = 1;
   displayShow("Scanne rechts...");
-  dreheRechts();
-  delay(DREH_DAUER_MS);
-  motorenStopp();
-  delay(SCAN_PAUSE_MS);
-  int abstandRechts = messeAbstand(sensorM);
+  servoSchreibeWinkel(SERVO_WINKEL_RECHTS);
+  delay(SERVO_BEWEGUNGSZEIT_MS);
+  int abstandRechts = messeAbstand();
 
-  // Not-Stopp-Pruefung mitten im Scan
-  if (!roboterAktiv) return;
-
-  // Zurueck zur Mitte
-  dreheLinks();
-  delay(DREH_DAUER_MS);
-  motorenStopp();
-  delay(SCAN_PAUSE_MS);
-
-  // --- Scan links ---
   displayShow("Scanne links...");
-  dreheLinks();
-  delay(DREH_DAUER_MS);
-  motorenStopp();
-  delay(SCAN_PAUSE_MS);
-  int abstandLinks = messeAbstand(sensorM);
-
-  // Not-Stopp-Pruefung mitten im Scan
-  if (!roboterAktiv) return;
-
-  // Zurueck zur Mitte
-  dreheRechts();
-  delay(DREH_DAUER_MS);
-  motorenStopp();
-  delay(SCAN_PAUSE_MS);
+  servoSchreibeWinkel(SERVO_WINKEL_LINKS);
+  delay(SERVO_BEWEGUNGSZEIT_MS * 2);   // laengerer Weg von rechts nach links
+  int abstandLinks = messeAbstand();
 
   Serial.print("  Scan R:"); Serial.print(abstandRechts);
   Serial.print(" L:"); Serial.println(abstandLinks);
 
-  // Entscheidung
   if (abstandLinks < schwelleFrontStop && abstandRechts < schwelleFrontStop) {
     displayShow("Umkehren!");
-    rueckwaerts();
+    rueckwaerts(LANGSAM_GESCHWINDIGKEIT);
     delay(600);
     motorenStopp();
     delay(200);
-    dreheRechts();
-    delay(DREH_DAUER_MS * 2);
-  } else if (abstandLinks >= abstandRechts) {
+    dreheRechts(drehgeschwindigkeit);
+    delayfactor = 2;  // laenger drehen, da beide Seiten blockiert
+  } 
+  else if (abstandLinks >= abstandRechts) {
     displayShow("Drehe links");
-    dreheLinks();
-    delay(DREH_DAUER_MS);
-  } else {
+    dreheLinks(drehgeschwindigkeit);
+  } 
+  else {
     displayShow("Drehe rechts");
-    dreheRechts();
-    delay(DREH_DAUER_MS);
+    dreheRechts(drehgeschwindigkeit);
   }
 
+  servoSchreibeWinkel(SERVO_WINKEL_MITTE);
+
+  if (SERVO_BEWEGUNGSZEIT_MS > DREH_DAUER_MS) {
+    delay(SERVO_BEWEGUNGSZEIT_MS * delayfactor);
+  } else {
+    delay(DREH_DAUER_MS * delayfactor);
+  }  
   motorenStopp();
-  delay(300);
+  delay(200);
+}
+
+void einfacherScanUndDrehe(String richtung) {
+  int delayfactor = 1;
+  displayShow("Scanne " + richtung);
+  if (richtung == "rechts") {
+    servoSchreibeWinkel(SERVO_WINKEL_RECHTS);
+  } else {  
+    servoSchreibeWinkel(SERVO_WINKEL_LINKS);
+  }
+  
+  delay(SERVO_BEWEGUNGSZEIT_MS);
+  int abstand = messeAbstand();
+
+  Serial.print("  Scan :"); Serial.print(abstand);
+ 
+  if (abstand > schwelleFrontStop) {
+    displayShow("Drehe " + richtung);
+    if (richtung == "rechts") {
+      dreheRechts(drehgeschwindigkeit);
+    } else {
+      dreheLinks(drehgeschwindigkeit);
+    }
+ 
+  }
+  else{
+    // Kein freier Weg --> Umkehren
+    dreheRechts(drehgeschwindigkeit);
+    delayfactor = 2;  // laenger drehen, da beide Seiten blockiert
+  }
+
+  servoSchreibeWinkel(SERVO_WINKEL_MITTE);
+
+  if (SERVO_BEWEGUNGSZEIT_MS > DREH_DAUER_MS) {
+    delay(SERVO_BEWEGUNGSZEIT_MS * delayfactor);
+  } else {
+    delay(DREH_DAUER_MS * delayfactor);
+  }   
+  motorenStopp();
+  delay(200);
+}
+
+// ============================================================
+//  Absturz-Routinen (Boden-IR-Sensoren)
+// ============================================================
+
+void routineBoden(String richtung, String sensorSeite) {
+  displayShow("Abgrund " + richtung + "!\nWeiche aus...");
+  motorenStopp();
+  delay(200);
+  if (richtung == "vorne") {
+    rueckwaerts(LANGSAM_GESCHWINDIGKEIT);
+  }
+  else {
+    // richtung == "hinten"
+    vorwaerts(LANGSAM_GESCHWINDIGKEIT);
+  }
+  delay(LANGSAME_FAHRT_DAUER_MS);
+  motorenStopp();
+  delay(200);
+
+  if (sensorSeite == "mitte") {
+    // Kein Seitenunterschied -> Richtung egal, einfach drehen
+    displayShow("Drehe...");
+    dreheRechts(drehgeschwindigkeit);
+    delay(DREH_DAUER_MS * 2);
+  }
+  else if (sensorSeite == "rechts") {
+    // Mehr Platz links -> nach links drehen
+    displayShow("Drehe links...");
+    dreheLinks(drehgeschwindigkeit);
+    delay(DREH_DAUER_MS);
+  }
+  else {
+    // Mehr Platz rechts -> nach rechts drehen
+    displayShow("Drehe rechts...");
+    dreheRechts(drehgeschwindigkeit);
+    delay(DREH_DAUER_MS);
+  }
+  motorenStopp();
+  delay(200);
+  return;
 }
 
 // ============================================================
@@ -263,75 +304,56 @@ void handleRoot() {
 
 void handleStart() {
   roboterAktiv = true;
+  servoSchreibeWinkel(SERVO_WINKEL_MITTE);
   displayShow("Start");
-  Serial.println("[WEB] Start");
   server.send(200, "text/plain", "Roboter faehrt");
 }
 
 void handleStopp() {
   roboterAktiv = false;
-  displayShow("Stopp");
   motorenStopp();
-  Serial.println("[WEB] Stopp");
+  displayShow("Stopp");
   server.send(200, "text/plain", "Gestoppt");
 }
 
 void handleScan() {
-  // Sofort antworten – Scan laeuft danach in loop()
   server.send(200, "text/plain", "Scan gestartet...");
   motorenStopp();
-  delay(300);
+  delay(200);
   scanneUndDrehe();
-  // roboterAktiv bleibt true -> loop() faehrt danach weiter
 }
 
 void handleAbstand() {
-  // Gecachte Werte aus letztem Loop-Durchlauf senden – keine neue Messung
-  String antwort = "M:" + String(cachedAbstandM) +
-                   " R:" + String(cachedAbstandR) +
-                   " L:" + String(cachedAbstandL);
-  server.send(200, "text/plain", antwort);
+  int u = messeAbstand();
+  String a = "U:"  + String(u) +
+            " HL:" + String(irErkannt(IR_HINDERNIS_LINKS)) +
+            " HM:" + String(irErkannt(IR_HINDERNIS_MITTE)) +  // ← fehlt
+            " HR:" + String(irErkannt(IR_HINDERNIS_RECHTS));
+  server.send(200, "text/plain", a);
 }
 
 void handleStufe() {
-  if (server.hasArg("wert")) {
-    int stufe = server.arg("wert").toInt();
-    switch (stufe) {
-      case 1: maxGeschwindigkeit = 120; break;
-      case 2: maxGeschwindigkeit = 165; break;
-      case 3: maxGeschwindigkeit = 210; break;
-      case 4: maxGeschwindigkeit = 255; break;
-      default: server.send(400, "text/plain", "Ungueltige Stufe"); return;
-    }
-    letzterFahrzustand = 'S';
-    Serial.print("[WEB] Stufe: "); Serial.print(stufe);
-    Serial.print(" -> max: "); Serial.println(maxGeschwindigkeit);
-    server.send(200, "text/plain", "OK");
-  } else {
-    server.send(400, "text/plain", "Kein Wert");
+  if (!server.hasArg("wert")) { server.send(400, "text/plain", "Kein Wert"); return; }
+  switch (server.arg("wert").toInt()) {
+    case 1: maxGeschwindigkeit = 120; break;
+    case 2: maxGeschwindigkeit = 165; break;
+    case 3: maxGeschwindigkeit = 210; break;
+    case 4: maxGeschwindigkeit = 255; break;
+    default: server.send(400, "text/plain", "Ungueltige Stufe"); return;
   }
+  server.send(200, "text/plain", "OK");
 }
 
 void handleParameter() {
-  if (server.hasArg("fs"))  schwelleFrontSlow   = constrain(server.arg("fs").toInt(),  1, 400);
-  if (server.hasArg("fl"))  schwelleFrontLimit  = constrain(server.arg("fl").toInt(),  1, 400);
-  if (server.hasArg("fp"))  schwelleFrontStop   = constrain(server.arg("fp").toInt(),  1, 400);
-  if (server.hasArg("sl"))  schwelleSeiteLimit  = constrain(server.arg("sl").toInt(),  1, 400);
-  if (server.hasArg("ss"))  schwelleSeiteStop   = constrain(server.arg("ss").toInt(),  1, 400);
-  if (server.hasArg("dg"))  drehgeschwindigkeit = constrain(server.arg("dg").toInt(),  0, 255);
-  if (server.hasArg("kp"))  kurveInnenProzent   = constrain(server.arg("kp").toInt(),  0, 100);
+  if (server.hasArg("fs")) schwelleFrontSlow   = constrain(server.arg("fs").toInt(), 1, 400);
+  if (server.hasArg("fp")) schwelleFrontStop   = constrain(server.arg("fp").toInt(), 1, 400);
+  if (server.hasArg("dg")) drehgeschwindigkeit = constrain(server.arg("dg").toInt(), 0, 255);
 
   String json = "{";
   json += "\"fs\":" + String(schwelleFrontSlow)   + ",";
-  json += "\"fl\":" + String(schwelleFrontLimit)  + ",";
   json += "\"fp\":" + String(schwelleFrontStop)   + ",";
-  json += "\"sl\":" + String(schwelleSeiteLimit)  + ",";
-  json += "\"ss\":" + String(schwelleSeiteStop)   + ",";
-  json += "\"dg\":" + String(drehgeschwindigkeit) + ",";
-  json += "\"kp\":" + String(kurveInnenProzent);
+  json += "\"dg\":" + String(drehgeschwindigkeit);
   json += "}";
-
-  Serial.println("[WEB] Parameter: " + json);
   server.send(200, "application/json", json);
 }
 
@@ -346,30 +368,47 @@ void setup() {
     Serial.println(F("SSD1306 allocation failed"));
     for (;;);
   }
-
   displayShow("Initialisierung");
 
+  // Motorpins
   pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
-
   ledcSetup(PWM_KANAL_A, PWM_FREQ, PWM_AUFLOES);
   ledcSetup(PWM_KANAL_B, PWM_FREQ, PWM_AUFLOES);
   ledcAttachPin(ENA, PWM_KANAL_A);
   ledcAttachPin(ENB, PWM_KANAL_B);
 
+  // Servo
+  ledcSetup(PWM_KANAL_SERVO, SERVO_FREQ, SERVO_AUFLOES);
+  ledcAttachPin(SERVO_PIN, PWM_KANAL_SERVO);
+  servoSchreibeWinkel(SERVO_WINKEL_MITTE);
+
+  // Ultraschall
+  pinMode(TRIG, OUTPUT);
+  pinMode(ECHO, INPUT);
+
+  // IR-Sensoren
+  pinMode(IR_HINDERNIS_LINKS,     INPUT);
+  pinMode(IR_HINDERNIS_RECHTS,    INPUT);
+  pinMode(IR_HINDERNIS_MITTE,     INPUT);
+  pinMode(IR_BODEN_VORNE_LINKS,   INPUT);
+  pinMode(IR_BODEN_VORNE_RECHTS,  INPUT);
+  pinMode(IR_BODEN_HINTEN_LINKS,  INPUT);
+  pinMode(IR_BODEN_HINTEN_RECHTS, INPUT);
+
   motorenStopp();
-  delay(2000);
+  delay(1500);
 
   WiFi.softAP(WLAN_SSID, WLAN_PASSWORT, WLAN_KANAL, WLAN_SSID_HIDDEN, WLAN_MAX_CLIENTS);
-  displayShow("WLAN gestartet\nIP: " + WiFi.softAPIP().toString());
+  displayShow("WLAN\nIP: " + WiFi.softAPIP().toString());
 
-  server.on("/",                handleRoot);
-  server.on("/start",           handleStart);
-  server.on("/stopp",           handleStopp);
-  server.on("/scan",            handleScan);
-  server.on("/abstand",         handleAbstand);
-  server.on("/stufe",           handleStufe);
-  server.on("/parameter",       handleParameter);
+  server.on("/",          handleRoot);
+  server.on("/start",     handleStart);
+  server.on("/stopp",     handleStopp);
+  server.on("/scan",      handleScan);
+  server.on("/abstand",   handleAbstand);
+  server.on("/stufe",     handleStufe);
+  server.on("/parameter", handleParameter);
   server.begin();
 }
 
@@ -381,58 +420,91 @@ void loop() {
   server.handleClient();
   if (!roboterAktiv) return;
 
-  // Alle drei Sensoren sequenziell auslesen und cachen
-  aktualisiereAbstaende();
+  // Einmalig alle Sensoren lesen
+  bool bvL = irErkannt(IR_BODEN_VORNE_LINKS);
+  bool bvR = irErkannt(IR_BODEN_VORNE_RECHTS);
+  bool bhL = irErkannt(IR_BODEN_HINTEN_LINKS);
+  bool bhR = irErkannt(IR_BODEN_HINTEN_RECHTS);
+  bool hiL = irErkannt(IR_HINDERNIS_LINKS);
+  bool hiR = irErkannt(IR_HINDERNIS_RECHTS);
+  bool hiM = irErkannt(IR_HINDERNIS_MITTE);
 
-  Serial.print("M:"); Serial.print(cachedAbstandM);
-  Serial.print(" R:"); Serial.print(cachedAbstandR);
-  Serial.print(" L:"); Serial.println(cachedAbstandL);
+  // Prioritaet 1: Boden vorne UND hinten gleichzeitig -> Notstopp
+  bool bv = bvL   || bvR;
+  bool bh = bhL  || bhR;
+  if (bv && bh) {
+      motorenStopp();
+      displayShow("NOTSTOPP\nBoden vorn+hinten");
+      return;   
+  }
 
-  // Adaptive Geschwindigkeit berechnen
-  geschwindigkeit = berechneGeschwindigkeit(cachedAbstandM);
+  // Prioritaet 2: Boden vorne -> ausweichen
+  if (bvL && bvR) {
+    routineBoden("vorne", "mitte");
+    return;
+  }
+  else if (bvR && !bvL) {
+    routineBoden("vorne", "rechts");
+    return;
+  }
+  else if (bvL && !bvR) {
+    routineBoden("vorne", "links");
+    return;
+  }
+  else{
+    // Kein Boden vorne erkannt, weiter mit den anderen Prioritaeten
+  }
 
-  // ── Prioritaet 1: STOP-Schwelle – sofort anhalten und scannen ──
-  if (cachedAbstandM < schwelleFrontStop ||
-      cachedAbstandR < schwelleSeiteStop ||
-      cachedAbstandL < schwelleSeiteStop) {
+  // Prioritaet 3: Boden hinten -> vorfahren
+  if (bhL && bhR) {
+    routineBoden("hinten", "mitte");
+    return;
+  }
+  else if (bhR && !bhL) {
+    routineBoden("hinten", "rechts");
+    return;
+  }
+  else if (bhL && !bhR) {
+    routineBoden("hinten", "links");
+    return;
+  }
+  else{
+    // Kein Boden hinten erkannt, weiter mit den anderen Prioritaeten
+  }
 
-    displayShow("BLOCKIERT!\nStoppe...");
+  // Prioritaet 4: IR-Hindernis schraeg vorne -> Stopp + Scan
+  if (hiR) {
     motorenStopp();
-    delay(300);
+    displayShow("Hindernis IR!\nScanne...");
+    delay(200);
+    einfacherScanUndDrehe("links");
+    return;
+  }
 
-    server.handleClient();
-    if (!roboterAktiv) return;
+  if (hiL) {
+    motorenStopp();
+    displayShow("Hindernis IR!\nScanne...");
+    delay(200);
+    einfacherScanUndDrehe("rechts");
+    return;
+  }
 
+  // Prioritaet 5: Ultraschall vorne
+  int abstand = messeAbstand();
+
+  if ((abstand < schwelleFrontStop) || hiM) {
+    motorenStopp();
+    displayShow("BLOCKIERT!");
+    delay(200);
     scanneUndDrehe();
     return;
   }
 
-  // ── Prioritaet 2: LIMIT-Schwelle Seite – Gegenlenken ──
-  if (cachedAbstandL < schwelleSeiteLimit && cachedAbstandR >= schwelleSeiteLimit) {
-    displayShow("Wand links\nlenke rechts");
-    kurveRechts();
-    return;
-  }
-
-  if (cachedAbstandR < schwelleSeiteLimit && cachedAbstandL >= schwelleSeiteLimit) {
-    displayShow("Wand rechts\nlenke links");
-    kurveLinks();
-    return;
-  }
-
-  // ── Prioritaet 3: LIMIT-Schwelle Front – Kurve zur freieren Seite ──
-  if (cachedAbstandM < schwelleFrontLimit) {
-    if (cachedAbstandL >= cachedAbstandR) {
-      displayShow("Front nah\nKurve links");
-      kurveLinks();
-    } else {
-      displayShow("Front nah\nKurve rechts");
-      kurveRechts();
-    }
-    return;
-  }
-
-  // ── Prioritaet 4: Freie Fahrt ──
-  displayShow("Fahre geradeaus");
-  vorwaerts();
+  /*
+  geschwindigkeit = berechneGeschwindigkeit(abstand);
+  displayShow("Fahre v:" + String(geschwindigkeit) +
+              "\nU:" + String(abstand) + "cm");
+  vorwaerts(geschwindigkeit);
+  */
+  vorwaerts(maxGeschwindigkeit);
 }
