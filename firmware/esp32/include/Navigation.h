@@ -3,9 +3,9 @@
 //  Reaktive Fahrlogik: Sensorauswertung, Geschwindigkeits-
 //  regelung und Ausweichroutinen.
 //
-//  Navigation kennt weder Display noch Robot – Statusmeldungen
-//  werden ueber einen Display-Callback nach aussen gegeben.
-//  Alle Fahrparameter sind zur Laufzeit aenderbar (Web-UI).
+//  Navigation kennt weder Display noch Robot – Rueckmeldungen
+//  erfolgen ausschliesslich ueber Callbacks:
+//    DisplayCallback   – Statustext ans Display
 // ============================================================
 
 #pragma once
@@ -18,27 +18,25 @@
 
 class Navigation {
 public:
-    using DisplayCallback = std::function<void(const String&)>;
+    using DisplayCallback   = std::function<void(const String&)>;
 
     // --------------------------------------------------------
     //  Konstruktor
-    //  Alle Sensor- und Motorobjekte werden per Referenz
-    //  uebergeben und muessen laenger leben als Navigation.
+    //  irFloorBottom: nach unten zeigender Sensor mit hoechster
+    //  Prioritaet – loest sofortigen Notstopp aus.
     // --------------------------------------------------------
     Navigation(MotorDriver&      motor,
                UltrasonicSensor& sonarCenter,
                UltrasonicSensor& sonarLeft,
                UltrasonicSensor& sonarRight,
                IrSensor&         irFloorLeft,
-               IrSensor&         irFloorRight);
+               IrSensor&         irFloorRight,
+               IrSensor&         irFloorBottom);
 
-    // Optionalen Display-Callback registrieren.
-    // Wird aufgerufen wann immer Navigation einen Status ausgibt.
-    void setDisplayCallback(DisplayCallback cb) { _displayCb = cb; }
+    void setDisplayCallback  (DisplayCallback   cb) { _displayCb   = cb; }
 
     // --------------------------------------------------------
-    //  Einen Navigations-Zyklus ausfuehren (in loop() bzw.
-    //  Robot::_handleRun() aufrufen).
+    //  Einen Navigations-Zyklus ausfuehren
     // --------------------------------------------------------
     void update();
 
@@ -48,24 +46,25 @@ public:
     // --------------------------------------------------------
     //  Fahrparameter (per Web-UI aenderbar)
     // --------------------------------------------------------
-    void    setMaxSpeed(uint8_t v)     { _maxSpeed      = constrain(v, 0, 255); }
-    void    setSlowThreshold(int v)    { _slowThreshold = v; }
-    void    setStopThreshold(int v)    { _stopThreshold = v; }
-    void    setTurnSpeed(uint8_t v)    { _turnSpeed     = constrain(v, 0, 255); }
+    void    setMaxSpeed     (uint8_t v) { _maxSpeed      = constrain(v, 0, 255); }
+    void    setTurnFrontThreshold(int     v) { _turnFrontThreshold = v; }
+    void    setStopThreshold(int     v) { _stopThreshold = v; }
+    void    setTurnSpeed    (uint8_t v) { _turnSpeed     = constrain(v, 0, 255); }
 
-    uint8_t maxSpeed()       const { return _maxSpeed;      }
-    int     slowThreshold()  const { return _slowThreshold; }
-    int     stopThreshold()  const { return _stopThreshold; }
-    uint8_t turnSpeed()      const { return _turnSpeed;     }
+    uint8_t maxSpeed()      const { return _maxSpeed;      }
+    int     turnFrontThreshold() const { return _turnFrontThreshold; }
+    int     stopThreshold() const { return _stopThreshold; }
+    uint8_t turnSpeed()     const { return _turnSpeed;     }
 
     // --------------------------------------------------------
-    //  Direkte Sensorwerte (fuer Webendpoint /abstand)
+    //  Sensorwerte (fuer Webendpoint /status)
     // --------------------------------------------------------
     int  distanceCenter();
     int  distanceLeft();
     int  distanceRight();
     bool floorFrontLeft();
     bool floorFrontRight();
+    bool floorBottom();
 
 private:
     MotorDriver&      _motor;
@@ -74,15 +73,18 @@ private:
     UltrasonicSensor& _sonarRight;
     IrSensor&         _irFloorLeft;
     IrSensor&         _irFloorRight;
+    IrSensor&         _irFloorBottom;
 
-    DisplayCallback _displayCb;
+    DisplayCallback   _displayCb;
 
     uint8_t _maxSpeed;
-    int     _slowThreshold;
+    int     _turnFrontThreshold;
+    int     _turnSideThreshold;
     int     _stopThreshold;
     uint8_t _turnSpeed;
+    bool    _emergencyStopTriggered;
 
     void    _display(const String& text);
     uint8_t _calcSpeed(int distanceCm);
-    void    _routineFloorFront();
+    void    _routineFloorFront(bool fallL, bool fallR);
 };

@@ -13,7 +13,6 @@
 //    INIT  → READY  (automatisch nach begin())
 //    READY → RUN    (start() / Web /start)
 //    RUN   → READY  (stop()  / Web /stopp)
-//    RUN   → STOP   (emergencyStop())
 //    STOP  → READY  (reset())
 // ============================================================
 
@@ -45,7 +44,6 @@ public:
     // --------------------------------------------------------
     void start();         // READY → RUN
     void stop();          // RUN   → READY
-    void emergencyStop(); // *     → STOP
     void reset();         // STOP  → READY
 
     State state() const { return _state; }
@@ -65,6 +63,7 @@ private:
     UltrasonicSensor _sonarRight;
     IrSensor         _irFloorLeft;
     IrSensor         _irFloorRight;
+    IrSensor         _irFloorBottom;   // hoechste Prioritaet – Notstopp
     Display          _display;
     Navigation       _navigation;
     WiFiController   _wifi;

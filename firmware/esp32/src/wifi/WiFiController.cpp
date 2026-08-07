@@ -3,6 +3,7 @@
 // ============================================================
 
 #include "WiFiController.h"
+#include "WebUI.h"
 #include "Config.h"
 
 // ============================================================
@@ -46,14 +47,7 @@ void WiFiController::handle() {
 void WiFiController::_setupRoutes() {
 
     _server.on("/", [this]() {
-        _server.send(200, "text/plain",
-            "KIRBY – Endpunkte:\n"
-            "  GET /start\n"
-            "  GET /stopp\n"
-            "  GET /scan\n"
-            "  GET /stufe?n=1..4\n"
-            "  GET /parameter?slow=X&stop=Y&turn=Z\n"
-            "  GET /status");
+        _server.send_P(200, "text/html", HTML_SEITE);
     });
 
     _server.on("/start", [this]() {

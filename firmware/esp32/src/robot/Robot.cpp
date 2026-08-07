@@ -31,11 +31,13 @@ Robot::Robot()
                     Ir::REFLECTION_LEVEL,  Ir::DEBOUNCE_US),
       _irFloorRight(Ir::FLOOR_FRONT_RIGHT, IrSensor::Mode::FLOOR,
                     Ir::REFLECTION_LEVEL,  Ir::DEBOUNCE_US),
+      _irFloorBottom(Ir::FLOOR_BOTTOM,     IrSensor::Mode::FLOOR,
+                    Ir::REFLECTION_LEVEL,  Ir::DEBOUNCE_US),
       _display(DisplayCfg::SDA, DisplayCfg::SCL,
                DisplayCfg::I2C_ADDR, DisplayCfg::WIDTH, DisplayCfg::HEIGHT),
       _navigation(_motor,
                   _sonarCenter, _sonarLeft, _sonarRight,
-                  _irFloorLeft, _irFloorRight),
+                  _irFloorLeft, _irFloorRight, _irFloorBottom),
       _wifi(Wifi::SSID, Wifi::PASSWORD,
             Wifi::CHANNEL, Wifi::HIDDEN, Wifi::MAX_CLIENTS)
 {}
@@ -56,7 +58,7 @@ void Robot::begin() {
     }
     _display.show("Initialisierung");
 
-    // Navigation: Display-Callback registrieren
+    // Navigation: Callbacks registrieren
     _navigation.setDisplayCallback([this](const String& text) {
         _display.show(text);
     });
@@ -68,6 +70,7 @@ void Robot::begin() {
     _sonarRight.begin();
     _irFloorLeft.begin();
     _irFloorRight.begin();
+    _irFloorBottom.begin();
 
     delay(500);
 
@@ -132,12 +135,6 @@ void Robot::stop() {
     _transitionTo(State::READY, "Bereit");
 }
 
-void Robot::emergencyStop() {
-    _motor.stop();
-    _transitionTo(State::STOP, "NOT-STOPP");
-    Serial.println(F("[Robot] NOT-STOPP ausgeloest"));
-}
-
 void Robot::reset() {
     if (_state != State::STOP) return;
     _transitionTo(State::READY, "Bereit");
@@ -176,7 +173,8 @@ void Robot::_registerWifiCallbacks() {
         if (_state == State::RUN || _state == State::READY) {
             _motor.stop();
             delay(200);
-            _navigation.scanAndTurn();
+            //_navigation.scanAndTurn();
+            // TODO: Button und Funktion evtl. entfernen
         }
     });
 
@@ -193,20 +191,21 @@ void Robot::_registerWifiCallbacks() {
     });
 
     _wifi.onParameter([this](int slow, int stopCm, int turn) {
-        if (slow   > 0) _navigation.setSlowThreshold(constrain(slow,   1, 400));
+        if (slow   > 0) _navigation.setTurnFrontThreshold(constrain(slow,   1, 400));
         if (stopCm > 0) _navigation.setStopThreshold(constrain(stopCm, 1, 400));
         if (turn   > 0) _navigation.setTurnSpeed((uint8_t)constrain(turn, 0, 255));
     });
 
     _wifi.onStatus([this]() -> String {
         return "State:"   + String((int)_state) +
-               " Slow:"   + String(_navigation.slowThreshold()) +
+               " Turn:"   + String(_navigation.turnFrontThreshold()) +
                " Stop:"   + String(_navigation.stopThreshold()) +
                " Speed:"  + String(_navigation.maxSpeed()) +
                " M:"      + String(_navigation.distanceCenter()) +
                " L:"      + String(_navigation.distanceLeft()) +
                " R:"      + String(_navigation.distanceRight()) +
                " FL:"     + String(_navigation.floorFrontLeft()  ? 1 : 0) +
-               " FR:"     + String(_navigation.floorFrontRight() ? 1 : 0);
+               " FR:"     + String(_navigation.floorFrontRight() ? 1 : 0) +
+               " BTM:"    + String(_navigation.floorBottom()    ? 1 : 0);
     });
 }
