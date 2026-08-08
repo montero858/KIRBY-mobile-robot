@@ -151,6 +151,10 @@ void Navigation::update() {
 
 void Navigation::scanAndTurn() {
 
+    const unsigned long _timeoutMs = 10000; // Timeout bei 10s
+    const unsigned long _start = millis();
+    int _testOffset = 30;
+
     _motor.stop();
     delay(200);
 
@@ -163,10 +167,7 @@ void Navigation::scanAndTurn() {
     int dC = distanceCenter();
     int dL = distanceLeft();
     int dR = distanceRight();
-    int timeout = 20000; // 20 Sekunden Timeout
-    int cnt = 0;
-    int testOffset = 30;
-
+    
     Serial.print("[Nav] Scan L:"); Serial.print(dL);
     Serial.print(" M:");           Serial.print(dC);
     Serial.print(" R:");           Serial.println(dR);
@@ -185,7 +186,7 @@ void Navigation::scanAndTurn() {
         _motor.turnRight(_turnSpeed);
     } 
 
-    while (cnt < timeout) {
+    while (millis() - _start < _timeoutMs) {
         dC = distanceCenter();
         dL = distanceLeft();
         dR = distanceRight();
@@ -194,12 +195,11 @@ void Navigation::scanAndTurn() {
         Serial.print(" M:");           Serial.print(dC);
         Serial.print(" R:");           Serial.println(dR);
 
-        if (dC >= _stopThreshold  + testOffset &&
-            dL >= _stopThreshold + testOffset &&
-            dR >= _stopThreshold + testOffset) {
+        if (dC >= _stopThreshold  + _testOffset &&
+            dL >= _stopThreshold + _testOffset &&
+            dR >= _stopThreshold + _testOffset) {
             break;
         }
-        cnt += 1; 
     }
     _motor.stop();
     delay(200);

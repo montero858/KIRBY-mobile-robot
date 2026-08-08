@@ -374,7 +374,7 @@ async function paramSenden() {
   const stop = $('p-stop').value;
   const speed = $('p-speed').value;
   try {
-    await fetch(`/parameter?turn=${turn}&stop=${stop}&speed=${speed }`);
+    await fetch(`/parameter?turn=${turn}&stop=${stop}&speed=${speed}`);
     feedback('Parameter gespeichert', '#1D9E75');
   } catch(e) {
     feedback('Fehler: ' + e, '#E24B4A');
@@ -426,7 +426,7 @@ function updateUI(kv) {
 
   // Aktive Stufe ermitteln
   const speed = kv.Speed;
-  const levels = [120, 165, 210, 255];
+  const levels = [165, 195, 225, 255];
   const activeLevel = levels.indexOf(speed) + 1;
   if (activeLevel > 0) {
     for (let i = 1; i <= 4; i++) {

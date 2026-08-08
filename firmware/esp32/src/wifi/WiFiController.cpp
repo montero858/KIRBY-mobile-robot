@@ -84,8 +84,8 @@ void WiFiController::_setupRoutes() {
                    ? _server.arg("slow").toInt() : -1;
         int stop = _server.hasArg("stop")
                    ? _server.arg("stop").toInt() : -1;
-        int turn = _server.hasArg("turn")
-                   ? _server.arg("turn").toInt() : -1;
+        int turn = _server.hasArg("speed")
+                   ? _server.arg("speed").toInt() : -1;
 
         if (_cbParam) _cbParam(slow, stop, turn);
         _server.send(200, "text/plain", "Parameter gesetzt");
