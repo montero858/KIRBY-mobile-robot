@@ -13,7 +13,6 @@ Zentrale Orchestrierung aller Subsysteme.
 
 - `Robot`
 - `RobotStateManager`
-- `SensorFusionManager`
 
 ## Ziel
 
