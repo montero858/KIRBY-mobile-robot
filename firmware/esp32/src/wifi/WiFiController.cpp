@@ -60,11 +60,6 @@ void WiFiController::_setupRoutes() {
         _server.send(200, "text/plain", "Gestoppt");
     });
 
-    _server.on("/scan", [this]() {
-        _server.send(200, "text/plain", "Scan gestartet...");
-        if (_cbScan) _cbScan();
-    });
-
     _server.on("/stufe", [this]() {
         if (!_server.hasArg("n")) {
             _server.send(400, "text/plain", "Fehlender Parameter: n");
@@ -80,14 +75,12 @@ void WiFiController::_setupRoutes() {
     });
 
     _server.on("/parameter", [this]() {
-        int slow = _server.hasArg("slow")
-                   ? _server.arg("slow").toInt() : -1;
+        int turn = _server.hasArg("turn")
+                   ? _server.arg("turn").toInt() : -1;
         int stop = _server.hasArg("stop")
                    ? _server.arg("stop").toInt() : -1;
-        int turn = _server.hasArg("speed")
-                   ? _server.arg("speed").toInt() : -1;
 
-        if (_cbParam) _cbParam(slow, stop, turn);
+        if (_cbParam) _cbParam(turn, stop);
         _server.send(200, "text/plain", "Parameter gesetzt");
     });
 

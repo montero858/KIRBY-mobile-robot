@@ -27,17 +27,13 @@ Robot::Robot()
                    Ultrasonic::MAX_DISTANCE_CM),
       _sonarRight (Ultrasonic::TRIG_RIGHT,  Ultrasonic::ECHO_RIGHT,
                    Ultrasonic::MAX_DISTANCE_CM),
-      _irFloorLeft (Ir::FLOOR_FRONT_LEFT,  IrSensor::Mode::FLOOR,
-                    Ir::REFLECTION_LEVEL,  Ir::DEBOUNCE_US),
-      _irFloorRight(Ir::FLOOR_FRONT_RIGHT, IrSensor::Mode::FLOOR,
-                    Ir::REFLECTION_LEVEL,  Ir::DEBOUNCE_US),
-      _irFloorBottom(Ir::FLOOR_BOTTOM,     IrSensor::Mode::FLOOR,
+      _irFloor(Ir::IR_FLOOR, IrSensor::Mode::FLOOR,
                     Ir::REFLECTION_LEVEL,  Ir::DEBOUNCE_US),
       _display(DisplayCfg::SDA, DisplayCfg::SCL,
                DisplayCfg::I2C_ADDR, DisplayCfg::WIDTH, DisplayCfg::HEIGHT),
       _navigation(_motor,
                   _sonarCenter, _sonarLeft, _sonarRight,
-                  _irFloorLeft, _irFloorRight, _irFloorBottom),
+                  _irFloor),
       _wifi(Wifi::SSID, Wifi::PASSWORD,
             Wifi::CHANNEL, Wifi::HIDDEN, Wifi::MAX_CLIENTS)
 {}
@@ -68,9 +64,7 @@ void Robot::begin() {
     _sonarCenter.begin();
     _sonarLeft.begin();
     _sonarRight.begin();
-    _irFloorLeft.begin();
-    _irFloorRight.begin();
-    _irFloorBottom.begin();
+    _irFloor.begin();
 
     delay(500);
 
@@ -93,7 +87,6 @@ void Robot::update() {
         case State::INIT:  _handleInit();  break;
         case State::READY: _handleReady(); break;
         case State::RUN:   _handleRun();   break;
-        case State::STOP:  _handleStop();  break;
     }
 }
 
@@ -115,11 +108,6 @@ void Robot::_handleRun() {
     _navigation.update();
 }
 
-void Robot::_handleStop() {
-    // Notfall-Stopp aktiv – warten auf reset().
-    // Motoren bereits in emergencyStop() gestoppt.
-}
-
 // ============================================================
 //  Oeffentliche Zustandsuebergaenge
 // ============================================================
@@ -132,11 +120,6 @@ void Robot::start() {
 void Robot::stop() {
     if (_state != State::RUN) return;
     _motor.stop();
-    _transitionTo(State::READY, "Bereit");
-}
-
-void Robot::reset() {
-    if (_state != State::STOP) return;
     _transitionTo(State::READY, "Bereit");
 }
 
@@ -169,15 +152,6 @@ void Robot::_registerWifiCallbacks() {
         stop();
     });
 
-    _wifi.onScan([this]() {
-        if (_state == State::RUN || _state == State::READY) {
-            _motor.stop();
-            delay(200);
-            //_navigation.scanAndTurn();
-            // TODO: Button und Funktion evtl. entfernen
-        }
-    });
-
     _wifi.onStufe([this](int stufe) {
         const uint8_t speeds[] = {
             Config::NavigationCfg::SPEED_LEVEL_1,
@@ -190,10 +164,9 @@ void Robot::_registerWifiCallbacks() {
         }
     });
 
-    _wifi.onParameter([this](int slow, int stopCm, int turn) {
-        if (slow   > 0) _navigation.setTurnFrontThreshold(constrain(slow,   1, 400));
+    _wifi.onParameter([this](int turn, int stopCm) {
+        if (turn   > 0) _navigation.setTurnFrontThreshold(constrain(turn,   1, 400));
         if (stopCm > 0) _navigation.setStopThreshold(constrain(stopCm, 1, 400));
-        if (turn   > 0) _navigation.setTurnSpeed((uint8_t)constrain(turn, 0, 255));
     });
 
     _wifi.onStatus([this]() -> String {
@@ -204,8 +177,6 @@ void Robot::_registerWifiCallbacks() {
                " M:"      + String(_navigation.distanceCenter()) +
                " L:"      + String(_navigation.distanceLeft()) +
                " R:"      + String(_navigation.distanceRight()) +
-               " FL:"     + String(_navigation.floorFrontLeft()  ? 1 : 0) +
-               " FR:"     + String(_navigation.floorFrontRight() ? 1 : 0) +
-               " BTM:"    + String(_navigation.floorBottom()    ? 1 : 0);
+               " BTM:"    + String(_navigation.floor()    ? 1 : 0);
     });
 }

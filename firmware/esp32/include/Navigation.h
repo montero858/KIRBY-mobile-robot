@@ -16,39 +16,111 @@
 #include "UltrasonicSensor.h"
 #include "IrSensor.h"
 
+
 class Navigation {
 public:
-    using DisplayCallback   = std::function<void(const String&)>;
+    using DisplayCallback = std::function<void(const String&)>;
+    using StuckCallback   = std::function<void()>;   // wird bei Timeout in BLOCKED_SCAN_TURN aufgerufen
 
-    // --------------------------------------------------------
-    //  Konstruktor
-    //  irFloorBottom: nach unten zeigender Sensor mit hoechster
-    //  Prioritaet – loest sofortigen Notstopp aus.
-    // --------------------------------------------------------
-    Navigation(MotorDriver&      motor,
-               UltrasonicSensor& sonarCenter,
-               UltrasonicSensor& sonarLeft,
-               UltrasonicSensor& sonarRight,
-               IrSensor&         irFloorLeft,
-               IrSensor&         irFloorRight,
-               IrSensor&         irFloorBottom);
+    // ---------------------------------------------------------
+    // Navigation states
+    // ---------------------------------------------------------
+
+    enum class State : uint8_t
+    {
+        DRIVING,
+
+        BLOCKED_REVERSE,
+        BLOCKED_SCAN_TURN,
+
+        FLOOR_REVERSE,
+        FLOOR_TURN,
+
+        EMERGENCY_STOP
+    };
+
+
+    // ---------------------------------------------------------
+    // Sensor snapshot
+    // ---------------------------------------------------------
+
+    struct SensorSnapshot
+    {
+        int center = 999;
+        int left   = 999;
+        int right  = 999;
+
+        bool floor = false;
+    };
+
+
+    // ---------------------------------------------------------
+    // Constructor
+    // ---------------------------------------------------------
+
+    Navigation(
+        MotorDriver& motor,
+        UltrasonicSensor& sonarCenter,
+        UltrasonicSensor& sonarLeft,
+        UltrasonicSensor& sonarRight,
+        IrSensor& irFloor
+    );
 
     void setDisplayCallback  (DisplayCallback   cb) { _displayCb   = cb; }
+    void setStuckCallback  (StuckCallback   cb) { _stuckCb   = cb; }
 
-    // --------------------------------------------------------
-    //  Einen Navigations-Zyklus ausfuehren
-    // --------------------------------------------------------
+    // ---------------------------------------------------------
+    // Main control
+    // ---------------------------------------------------------
+
+    /**
+     * Must be called continuously from Robot::update().
+     *
+     * The method is deliberately non-blocking:
+     * no delay() based navigation logic is used here.
+     */
     void update();
 
-    // Oeffentlich fuer den /scan-Webendpoint
-    void scanAndTurn();
+
+    /**
+     * Start autonomous navigation.
+     */
+    void start();
+
+
+    /**
+     * Stop autonomous navigation immediately.
+     */
+    void stop();
+
+
+    // ---------------------------------------------------------
+    // State information
+    // ---------------------------------------------------------
+
+    State state() const;
+
+    const SensorSnapshot& sensors() const;
+
 
     // --------------------------------------------------------
     //  Fahrparameter (per Web-UI aenderbar)
     // --------------------------------------------------------
     void    setMaxSpeed     (uint8_t v) { _maxSpeed      = constrain(v, 0, 255); }
-    void    setTurnFrontThreshold(int     v) { _turnFrontThreshold = v; }
-    void    setStopThreshold(int     v) { _stopThreshold = v; }
+
+    // setTurnFrontThreshold()/setStopThreshold() stellen sicher, dass
+    // _turnFrontThreshold > _stopThreshold bleibt, unabhaengig von der
+    // Reihenfolge, in der beide Werte (z.B. per Web-UI) gesetzt werden.
+    // Andernfalls wuerde _calcSpeed() durch ein negatives oder Null-
+    // "range" fehlerhafte Geschwindigkeiten berechnen.
+    void    setTurnFrontThreshold(int     v) { _turnFrontThreshold = max(v, _stopThreshold + 1); }
+    void    setStopThreshold(int     v) {
+        _stopThreshold = v;
+        if (_turnFrontThreshold <= _stopThreshold) {
+            _turnFrontThreshold = _stopThreshold + 1;
+        }
+    }
+    //TODO: Not needed anymore! Full signal chain needs to be removed
     void    setTurnSpeed    (uint8_t v) { _turnSpeed     = constrain(v, 0, 255); }
 
     uint8_t maxSpeed()      const { return _maxSpeed;      }
@@ -56,35 +128,136 @@ public:
     int     stopThreshold() const { return _stopThreshold; }
     uint8_t turnSpeed()     const { return _turnSpeed;     }
 
+
     // --------------------------------------------------------
     //  Sensorwerte (fuer Webendpoint /status)
     // --------------------------------------------------------
+    
     int  distanceCenter();
     int  distanceLeft();
     int  distanceRight();
-    bool floorFrontLeft();
-    bool floorFrontRight();
-    bool floorBottom();
+    bool floor();
 
 private:
-    MotorDriver&      _motor;
+
+    // ---------------------------------------------------------
+    // Hardware references
+    // ---------------------------------------------------------
+
+    MotorDriver& _motor;
+
     UltrasonicSensor& _sonarCenter;
     UltrasonicSensor& _sonarLeft;
     UltrasonicSensor& _sonarRight;
-    IrSensor&         _irFloorLeft;
-    IrSensor&         _irFloorRight;
-    IrSensor&         _irFloorBottom;
+
+    IrSensor& _irFloor;
 
     DisplayCallback   _displayCb;
+    StuckCallback     _stuckCb;
+
+    // ---------------------------------------------------------
+    // Sensor state
+    // ---------------------------------------------------------
+
+    SensorSnapshot _sensors;
+
+
+    // ---------------------------------------------------------
+    // Navigation state
+    // ---------------------------------------------------------
+
+    State _state = State::DRIVING;
+
+
+
+    // ---------------------------------------------------------
+    // Runtime parameters
+    // ---------------------------------------------------------
 
     uint8_t _maxSpeed;
-    int     _turnFrontThreshold;
-    int     _turnSideThreshold;
-    int     _stopThreshold;
     uint8_t _turnSpeed;
-    bool    _emergencyStopTriggered;
+    uint16_t _reverseDuration;
+    uint16_t _safetyDelay;
+    uint16_t _scanTurnTimeout;
 
-    void    _display(const String& text);
-    uint8_t _calcSpeed(int distanceCm);
-    void    _routineFloorFront(bool fallL, bool fallR);
+    int _turnFrontThreshold;
+    int _turnSideThreshold;
+    int _stopThreshold;
+    int _margin;
+
+
+    // ---------------------------------------------------------
+    // Timing
+    // ---------------------------------------------------------
+
+    unsigned long _stateStartedAt = 0;
+    unsigned long _lastSensorUpdate = 0;
+
+
+    // ---------------------------------------------------------
+    // Sensor handling
+    // ---------------------------------------------------------
+
+    /**
+     * Read all navigation sensors and update _sensors.
+     */
+    void _updateSensors();
+
+
+    // ---------------------------------------------------------
+    // State handlers
+    // ---------------------------------------------------------
+
+    void _updateDriving();
+    void _updateBlockedReverse();
+    void _updateBlockedScanAndTurn();
+    void _updateFloorReverse();
+    void _updateFloorTurn();
+    void _updateEmergencyStop();
+
+
+    // ---------------------------------------------------------
+    // Avoidance
+    // ---------------------------------------------------------
+
+    /**
+     * Start the normal obstacle avoidance sequence.
+     */
+    void _startBlockedReverse();
+    void _startBlockedScanAndTurn();
+
+
+    /**
+     * Start the floor/edge avoidance sequence.
+     */
+    void _startFloorAvoidance();
+    
+    // ---------------------------------------------------------
+    // Motion
+    // ---------------------------------------------------------
+
+    /**
+     * Calculate a speed depending on the distance
+     * to the obstacle.
+     */
+    uint8_t _calcSpeed(int distanceCm) const;
+
+
+    // ---------------------------------------------------------
+    // State / timing helpers
+    // ---------------------------------------------------------
+
+    /**
+     * Change state and reset the state timer.
+     */
+    void _transitionTo(State next);
+
+
+    /**
+     * Check whether the current state has been active
+     * for at least the specified amount of time.
+     */
+    bool _stateElapsed(unsigned long duration) const;
+
+    void _display(const String& text);
 };

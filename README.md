@@ -21,7 +21,7 @@ An experimental robotics project based on the **ESP32 DevKit V1**. The goal is n
 | Sensor | Quantity | Mounting | Function |
 |--------|----------|----------|----------|
 | HC-SR04 | 3× | Front centre, front left (angled), front right (angled) | Obstacle distance measurement |
-| TCRT5000 IR | 2× | Front left (downward), front right (downward) | Fall protection |
+| TCRT5000 IR | 1× | Middle (downward) | Motor-Stop |
 
 ### Power System
 
@@ -46,8 +46,7 @@ An experimental robotics project based on the **ESP32 DevKit V1**. The goal is n
 | 25 | D25 | HC-SR04 left – ECHO *(Logic Level Converter!)* |
 | 33 | D33 | HC-SR04 right – TRIG |
 | 32 | D32 | HC-SR04 right – ECHO *(Logic Level Converter!)* |
-| 34 | D34 | IR floor front left (input-only) |
-| 35 | D35 | IR floor front right (input-only) |
+
 
 ### Side B – 3V3 (Motor control + I2C)
 
@@ -61,6 +60,7 @@ An experimental robotics project based on the **ESP32 DevKit V1**. The goal is n
 | 19 | D19 | ENB – Motor B PWM |
 | 21 | D21 | SDA – SSD1306 I2C |
 | 22 | D22 | SCL – SSD1306 I2C |
+| 13 | D13 | IR floor bottom |
 
 > **Notes:**
 > - GPIO 12 (D12) is a strapping pin – not used
@@ -75,11 +75,20 @@ An experimental robotics project based on the **ESP32 DevKit V1**. The goal is n
 
 - PlatformIO (Arduino framework)
 
+### Setup
+
+WiFi credentials are kept out of version control. Before building:
+
+```
+cp firmware/esp32/include/Secrets.example.h firmware/esp32/include/Secrets.h
+```
+
+Then edit `Secrets.h` and fill in the real `SSID`/`PASSWORD`. This file is listed in `.gitignore` and must never be committed.
+
 ### Libraries
 
 | Library | Purpose |
 |---------|---------|
-| `SR04` (mrRobot62) | HC-SR04 ultrasonic driver |
 | `Adafruit SSD1306` | OLED display |
 | `Adafruit GFX` | Graphics base layer |
 | `WiFi.h` | ESP32 core (built-in) |
@@ -94,17 +103,20 @@ KIRBY/
 │
 ├── firmware/
 │   └── esp32/
+│       ├── include/             # Shared headers
 │       ├── src/
 │       │   ├── drivers/         # Hardware abstractions: Motor, Ultrasonic, IR, Display
-│       │   ├── control/         # Speed controller
 │       │   ├── navigation/      # State machine, scan logic, avoidance routines
 │       │   ├── robot/           # Top-level Robot class
+│       │   ├── wifi/            # WiFiController.h/.cpp – Access Point + HTTP endpoints
+│       │   │                    # WebUI.h – embedded HTML/CSS/JS interface
+|       |   ├── Config.h
+│       │   ├── Secrets.example.h   # Template – committed
+│       │   ├── Secrets.h           # Real credentials – gitignored, not committed
 │       │   └── main.cpp
-│       ├── include/             # Shared headers, config.h
-│       ├── lib/
-│       │   └── WiFiControl/     # WiFiControl.h – browser interface
 │       └── platformio.ini
 │
+├── .gitignore
 └── README.md
 ```
 
@@ -115,10 +127,12 @@ KIRBY/
 Priority-based reactive state machine evaluated every loop iteration:
 
 ```
-1. IR floor front (any)  →  Stop + reverse + turn 90°
-2. HC-SR04 (any) < STOP  →  Stop + scan (sweep left/right) + turn
-3. HC-SR04 centre < SLOW →  Reduce speed linearly toward minimum
-4. Otherwise             →  Forward at selected speed
+1. IR floor bottom        →  Immediate stop; resumes automatically after a
+                              short safety delay once the sensor clears
+2. Any HC-SR04 < STOP     →  Stop → reverse briefly → turn toward the freer
+                              side (based on last left/right readings) → resume
+3. HC-SR04 centre < SLOW  →  Reduce speed linearly toward the minimum
+4. Otherwise              →  Forward at the selected speed level
 ```
 
 Speed reduces linearly between the `SLOW` threshold (100 cm default) and the `STOP` threshold (30 cm default). Below `STOP`, the robot halts and scans by comparing left and right readings to choose the freer side.
@@ -129,16 +143,14 @@ Speed reduces linearly between the `SLOW` threshold (100 cm default) and the `ST
 
 Access point: **KIRBY** · Interface: `http://192.168.4.1`
 
-| Control | Description |
-|---------|-------------|
-| Start / Stop | Enable or disable autonomous driving |
-| Scan | Trigger a manual scan and reorient |
-| Speed 1–4 | Set max PWM: 120 / 165 / 210 / 255 |
-| Parameter tuning | Adjust `SLOW`, `STOP` and turn speed live without reflashing |
-| Sensor monitor | Live readout of all sensor states |
+- Start/stop the autonomous drive
+- 4 speed levels
+- Adjustable turn and stop thresholds (cm)
+- Live status (distances, state) every 800 ms
+- Layout adapts to portrait and landscape orientation
 
 ---
 
 ## Current Status
 
-Experimental project – no fixed goal. Current implementation covers basic reactive navigation with three-sensor obstacle detection and IR-based fall protection. Code is procedural (Arduino/C++); an object-oriented refactor is planned as the next structural step.
+Experimental project – no fixed goal. Current implementation covers basic reactive navigation with three-sensor obstacle detection and IR-based safety stop.

@@ -7,11 +7,10 @@
 //  Endpunkte die das Interface nutzt:
 //    GET  /start
 //    GET  /stopp
-//    GET  /scan
 //    GET  /stufe?n=1..4
-//    GET  /parameter?turn=X&stop=Y&turn=Z
+//    GET  /parameter?turn=X&stop=Y
 //    GET  /status   → "State:N Turn:N Stop:N Speed:N
-//                       M:N L:N R:N FL:N FR:N BTM:N"
+//                       M:N L:N R:N BTM:N"
 // ============================================================
 
 #pragma once
@@ -123,31 +122,6 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
   .sensor-value.alert { color: var(--red); }
   .sensor-value.ok    { color: var(--green); }
 
-  .ir-row {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-  }
-
-  .ir-item {
-    flex: 1;
-    background: var(--bg);
-    border-radius: 8px;
-    padding: 6px;
-    text-align: center;
-    font-size: 11px;
-    color: var(--muted);
-  }
-
-  .ir-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--dim);
-    margin: 4px auto 2px;
-  }
-  .ir-dot.on { background: var(--red); box-shadow: 0 0 6px var(--red); }
-
   /* ── Buttons ── */
   .btn {
     width: 100%;
@@ -166,7 +140,6 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
 
   .btn-start { background: var(--green); color: #fff; }
   .btn-stop  { background: var(--dim);   color: var(--text); }
-  .btn-scan  { background: var(--blue);  color: #fff; }
 
   /* ── Geschwindigkeitsstufen ── */
   .speed-btns {
@@ -256,82 +229,142 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
     max-width: 360px;
     padding-left: 4px;
   }
+
+  /* ── Queerformat (Landschaft) ──────────────────────────────
+     .layout/.col/.btn-row wirken im Hochformat als "display:
+     contents" – die Elemente bleiben direkte Flex-Kinder des
+     body und die Reihenfolge/Optik ist unveraendert zur
+     bisherigen Hochformat-Ansicht. Erst die Media-Query unten
+     aktiviert das Zweispalten-Layout fuer flache Bildschirme. */
+  .layout,
+  .col,
+  .btn-row {
+    display: contents;
+  }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    body {
+      padding: 12px 20px;
+      gap: 8px;
+      justify-content: flex-start;
+    }
+
+    h1 {
+      font-size: 18px;
+      letter-spacing: 2px;
+      margin-bottom: 0;
+    }
+
+    .layout {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 16px;
+      width: 100%;
+      max-width: 640px;
+    }
+
+    .col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .col-status  { flex: 0 0 220px; }
+    .col-controls { flex: 1 1 300px; max-width: 320px; }
+
+    .card {
+      padding: 10px 14px;
+    }
+
+    .sensor-value {
+      font-size: 15px;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-direction: row;
+      gap: 8px;
+    }
+
+    .btn-row .btn {
+      width: auto;
+      max-width: none;
+      flex: 1;
+      padding: 10px;
+    }
+
+    #feedback {
+      min-height: 14px;
+    }
+  }
 </style>
 </head>
 <body>
 
 <h1>KIRBY</h1>
 
-<!-- Status-Karte -->
-<div class="card">
-  <div class="card-title">Status
-  <span id="state-badge" class="badge-init">INIT</span>
-   </div>
-  <div class="sensor-grid">
-    <div class="sensor-item">
-      <div class="sensor-label">Links</div>
-      <div class="sensor-value" id="dist-l">–</div>
-    </div>
-    <div class="sensor-item">
-      <div class="sensor-label">Mitte</div>
-      <div class="sensor-value" id="dist-m">–</div>
-    </div>
-    <div class="sensor-item">
-      <div class="sensor-label">Rechts</div>
-      <div class="sensor-value" id="dist-r">–</div>
+<div class="layout">
+
+  <div class="col col-status">
+    <!-- Status-Karte -->
+    <div class="card">
+      <div class="card-title">Status
+      <span id="state-badge" class="badge-init">INIT</span>
+       </div>
+      <div class="sensor-grid">
+        <div class="sensor-item">
+          <div class="sensor-label">Links</div>
+          <div class="sensor-value" id="dist-l">–</div>
+        </div>
+        <div class="sensor-item">
+          <div class="sensor-label">Mitte</div>
+          <div class="sensor-value" id="dist-m">–</div>
+        </div>
+        <div class="sensor-item">
+          <div class="sensor-label">Rechts</div>
+          <div class="sensor-value" id="dist-r">–</div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="ir-row">
-    <div class="ir-item">
-      <div class="ir-dot" id="ir-fl"></div>
-      Boden vl
+  <div class="col col-controls">
+    <!-- Steuerung -->
+    <span class="section-label">Steuerung</span>
+    <div class="btn-row">
+      <button class="btn btn-start" onclick="sende('/start')">Start</button>
+      <button class="btn btn-stop"  onclick="sende('/stopp')">Stopp</button>
     </div>
-    <div class="ir-item">
-      <div class="ir-dot" id="ir-btm"></div>
-      Boden btm
+
+    <!-- Geschwindigkeitsstufen -->
+    <span class="section-label">Geschwindigkeit</span>
+    <div class="speed-btns">
+      <button class="speed-btn aktiv" id="s1" onclick="setzeStufe(1)">1</button>
+      <button class="speed-btn"       id="s2" onclick="setzeStufe(2)">2</button>
+      <button class="speed-btn"       id="s3" onclick="setzeStufe(3)">3</button>
+      <button class="speed-btn"       id="s4" onclick="setzeStufe(4)">4</button>
     </div>
-    <div class="ir-item">
-      <div class="ir-dot" id="ir-fr"></div>
-      Boden vr
+
+    <!-- Parameter -->
+    <span class="section-label">Abstimmung</span>
+    <div class="card">
+      <div class="param-row">
+        <span class="param-label">Turn-Schwelle (cm)</span>
+        <input type="number" id="p-turn" min="1" max="400" value="100">
+      </div>
+      <div class="param-row">
+        <span class="param-label">Stop-Schwelle (cm)</span>
+        <input type="number" id="p-stop" min="1" max="400" value="30">
+      </div>
     </div>
+    <button class="btn btn-param" onclick="paramSenden()">↺ Parameter übernehmen</button>
+
+    <div id="feedback"></div>
   </div>
+
 </div>
-
-<!-- Steuerung -->
-<span class="section-label">Steuerung</span>
-<button class="btn btn-start" onclick="sende('/start')">Start</button>
-<button class="btn btn-stop"  onclick="sende('/stopp')">Stopp</button>
-<button class="btn btn-scan"  onclick="sende('/scan')">Neu scannen</button>
-
-<!-- Geschwindigkeitsstufen -->
-<span class="section-label">Geschwindigkeit</span>
-<div class="speed-btns">
-  <button class="speed-btn aktiv" id="s1" onclick="setzeStufe(1)">1</button>
-  <button class="speed-btn"       id="s2" onclick="setzeStufe(2)">2</button>
-  <button class="speed-btn"       id="s3" onclick="setzeStufe(3)">3</button>
-  <button class="speed-btn"       id="s4" onclick="setzeStufe(4)">4</button>
-</div>
-
-<!-- Parameter -->
-<span class="section-label">Abstimmung</span>
-<div class="card">
-  <div class="param-row">
-    <span class="param-label">Turn-Schwelle (cm)</span>
-    <input type="number" id="p-turn" min="1" max="400" value="100">
-  </div>
-  <div class="param-row">
-    <span class="param-label">Stop-Schwelle (cm)</span>
-    <input type="number" id="p-stop" min="1" max="400" value="30">
-  </div>
-  <div class="param-row">
-    <span class="param-label">Drehgeschwindigkeit</span>
-    <input type="number" id="p-speed" min="0" max="255" value="200">
-  </div>
-</div>
-<button class="btn btn-param" onclick="paramSenden()">↺ Parameter übernehmen</button>
-
-<div id="feedback"></div>
 
 <script>
 // ── Hilfsfunktionen ──────────────────────────────────────────
@@ -372,9 +405,8 @@ async function setzeStufe(n) {
 async function paramSenden() {
   const turn = $('p-turn').value;
   const stop = $('p-stop').value;
-  const speed = $('p-speed').value;
   try {
-    await fetch(`/parameter?turn=${turn}&stop=${stop}&speed=${speed}`);
+    await fetch(`/parameter?turn=${turn}&stop=${stop}`);
     feedback('Parameter gespeichert', '#1D9E75');
   } catch(e) {
     feedback('Fehler: ' + e, '#E24B4A');
@@ -382,7 +414,7 @@ async function paramSenden() {
 }
 
 // ── Status-Parser ────────────────────────────────────────────
-// Erwartet: "State:N Turn:N Stop:N Speed:N M:N L:N R:N FL:N FR:N BTM:N"
+// Erwartet: "State:N Turn:N Stop:N Speed:N M:N L:N R:N BTM:N"
 
 const STATE_LABELS = ['INIT', 'READY', 'RUN', 'STOP'];
 const STATE_CLASSES = ['badge-init', 'badge-ready', 'badge-run', 'badge-stop'];
@@ -419,10 +451,6 @@ function updateUI(kv) {
     el.textContent = (v >= 999) ? '–' : v + ' cm';
     el.className = 'sensor-value ' + distColor(v);
   });
-
-  // IR-Boden
-  $('ir-fl').classList.toggle('on', kv.FL === 1);
-  $('ir-fr').classList.toggle('on', kv.FR === 1);
 
   // Aktive Stufe ermitteln
   const speed = kv.Speed;

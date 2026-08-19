@@ -7,13 +7,11 @@
 //    INIT   – Hardware wird initialisiert (begin())
 //    READY  – Bereit, wartet auf Start-Befehl (Motoren aus)
 //    RUN    – Autonome Fahrt aktiv (Navigation::update())
-//    STOP   – Notfall-Stopp, wartet auf reset()
 //
 //  Erlaubte Uebergaenge:
 //    INIT  → READY  (automatisch nach begin())
 //    READY → RUN    (start() / Web /start)
 //    RUN   → READY  (stop()  / Web /stopp)
-//    STOP  → READY  (reset())
 // ============================================================
 
 #pragma once
@@ -28,7 +26,7 @@
 
 class Robot {
 public:
-    enum class State { INIT, READY, RUN, STOP };
+    enum class State { INIT, READY, RUN };
 
     Robot();
 
@@ -44,7 +42,6 @@ public:
     // --------------------------------------------------------
     void start();         // READY → RUN
     void stop();          // RUN   → READY
-    void reset();         // STOP  → READY
 
     State state() const { return _state; }
 
@@ -61,9 +58,7 @@ private:
     UltrasonicSensor _sonarCenter;
     UltrasonicSensor _sonarLeft;
     UltrasonicSensor _sonarRight;
-    IrSensor         _irFloorLeft;
-    IrSensor         _irFloorRight;
-    IrSensor         _irFloorBottom;   // hoechste Prioritaet – Notstopp
+    IrSensor         _irFloor;   // hoechste Prioritaet – Notstopp
     Display          _display;
     Navigation       _navigation;
     WiFiController   _wifi;
@@ -74,7 +69,6 @@ private:
     void _handleInit();
     void _handleReady();
     void _handleRun();
-    void _handleStop();
 
     void _transitionTo(State next, const String& displayText = "");
 
