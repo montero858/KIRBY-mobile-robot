@@ -127,15 +127,18 @@ KIRBY/
 Priority-based reactive state machine evaluated every loop iteration:
 
 ```
-1. IR floor bottom        →  Immediate stop; resumes automatically after a
-                              short safety delay once the sensor clears
+1. IR floor bottom        →  Immediate stop while lifted; once the sensor
+                              clears (robot back on the ground), waits a
+                              fixed safety delay before resuming
 2. Any HC-SR04 < STOP     →  Stop → reverse briefly → turn toward the freer
                               side (based on last left/right readings) → resume
 3. HC-SR04 centre < SLOW  →  Reduce speed linearly toward the minimum
 4. Otherwise              →  Forward at the selected speed level
 ```
 
-Speed reduces linearly between the `SLOW` threshold (100 cm default) and the `STOP` threshold (30 cm default). Below `STOP`, the robot halts and scans by comparing left and right readings to choose the freer side.
+Speed reduces linearly between the `FRONT_TURN_THRESHOLD_CM` and the `STOP_THRESHOLD_CM`. Below `STOP_THRESHOLD_CM`, the robot halts and scans by comparing left and right readings to choose the freer side. If neither side clears within `SCAN_TURN_TIMEOUT_MS`, the robot gives up turning and returns to normal driving rather than spinning indefinitely.
+
+The safety delay after being lifted (`SAFETY_DELAY_MS`) always starts counting from the moment the robot is set back down, not from the moment it was picked up — so the wait is the same length regardless of how long it was held in the air.
 
 ---
 
@@ -145,7 +148,7 @@ Access point: **KIRBY** · Interface: `http://192.168.4.1`
 
 - Start/stop the autonomous drive
 - 4 speed levels
-- Adjustable turn and stop thresholds (cm)
+- Adjustable turn and stop thresholds (cm) — input fields are populated live from `/status` on load and kept in sync with the firmware's actual values (not hardcoded), so they never drift from `Config.h` or from values changed at runtime
 - Live status (distances, state) every 800 ms
 - Layout adapts to portrait and landscape orientation
 

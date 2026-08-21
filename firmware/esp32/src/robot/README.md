@@ -12,7 +12,6 @@ Zentrale Orchestrierung aller Subsysteme.
 ## Beispielklassen
 
 - `Robot`
-- `RobotStateManager`
 
 ## Ziel
 

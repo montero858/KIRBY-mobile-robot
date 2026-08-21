@@ -27,7 +27,6 @@ Navigation::Navigation(MotorDriver&      motor,
       _safetyDelay(NavigationCfg::SAFETY_DELAY_MS),
       _scanTurnTimeout(NavigationCfg::SCAN_TURN_TIMEOUT_MS),
       _turnFrontThreshold(NavigationCfg::FRONT_TURN_THRESHOLD_CM),
-      _turnSideThreshold(NavigationCfg::SIDE_TURN_THRESHOLD_CM),
       _stopThreshold(NavigationCfg::STOP_THRESHOLD_CM),
       _margin(NavigationCfg::MARGIN_CM)
 {
@@ -61,9 +60,14 @@ void Navigation::update() {
     }
 
     if (_sensors.floor) {
+        // Roboter angehoben: sofort stoppen, Zustand EMERGENCY_STOP.
+        // Der Recovery-Timer wird bewusst noch NICHT gestartet - das
+        // passiert erst in _updateEmergencyStop(), sobald der Boden
+        // wieder erkannt wird (_sensors.floor == false).
         if (_state != State::EMERGENCY_STOP) {
             _transitionTo(State::EMERGENCY_STOP);
         }
+        _emergencyRecoveryArmed = false;
         _motor.stop();
         return;
     }
@@ -72,9 +76,6 @@ void Navigation::update() {
         case State::DRIVING:           _updateDriving();            break;
         case State::BLOCKED_REVERSE:   _updateBlockedReverse();     break;
         case State::BLOCKED_SCAN_TURN: _updateBlockedScanAndTurn(); break;
-        // SZENARIO WIRD NOCH NICHT UNTERSTÜTZT
-        // case State::FLOOR_REVERSE:     _updateFloorReverse();       break;
-        // case State::FLOOR_TURN:        _updateFloorTurn();          break;
         case State::EMERGENCY_STOP:    _updateEmergencyStop();      break;
     }
 }
@@ -122,44 +123,6 @@ void Navigation::_updateDriving() {
         _startBlockedReverse();
         return;
     }
-
-
-    /*
-     * Hindernis seitlich:
-     *
-     * links blockiert → rechts fahren
-     * rechts blockiert → links fahren
-     */
-/* SZENARIO WIRD NOCH NICHT UNTERSTÜTZT
-    if (_leftBlocked())
-    {
-        _display("Kurve rechts");
-
-        _motor.curveRight(
-            _maxSpeed,
-            _calcSpeed(_sensors.center)
-        );
-
-        return;
-    }
-
-    if (_rightBlocked())
-    {
-        _display("Kurve links");
-
-        _motor.curveLeft(
-            _maxSpeed,
-            _calcSpeed(_sensors.center)
-        );
-
-        return;
-    }
-*/
-
-    /*
-     * Front wird enger:
-     * Geschwindigkeit reduzieren.
-     */
 
     uint8_t speed =
         _calcSpeed(_sensors.center);
@@ -238,6 +201,14 @@ void Navigation::_updateEmergencyStop() {
     _motor.stop();
     // Diese Funktion wird nur erreicht, wenn floorBottom bereits false ist
     // (siehe update()) – die frühere Prüfung hier war unerreichbar.
+
+    if (!_emergencyRecoveryArmed) {
+        // Boden gerade wieder erkannt: Delay ab JETZT zaehlen,
+        // nicht ab dem Zeitpunkt des Anhebens.
+        _stateStartedAt = millis();
+        _emergencyRecoveryArmed = true;
+        return;
+    }
 
     if (_stateElapsed(_safetyDelay)){
         _display("Bereit");

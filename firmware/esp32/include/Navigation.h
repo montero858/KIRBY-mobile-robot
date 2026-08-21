@@ -32,10 +32,6 @@ public:
 
         BLOCKED_REVERSE,
         BLOCKED_SCAN_TURN,
-
-        FLOOR_REVERSE,
-        FLOOR_TURN,
-
         EMERGENCY_STOP
     };
 
@@ -120,13 +116,10 @@ public:
             _turnFrontThreshold = _stopThreshold + 1;
         }
     }
-    //TODO: Not needed anymore! Full signal chain needs to be removed
-    void    setTurnSpeed    (uint8_t v) { _turnSpeed     = constrain(v, 0, 255); }
 
     uint8_t maxSpeed()      const { return _maxSpeed;      }
     int     turnFrontThreshold() const { return _turnFrontThreshold; }
     int     stopThreshold() const { return _stopThreshold; }
-    uint8_t turnSpeed()     const { return _turnSpeed;     }
 
 
     // --------------------------------------------------------
@@ -175,13 +168,11 @@ private:
     // ---------------------------------------------------------
 
     uint8_t _maxSpeed;
-    uint8_t _turnSpeed;
     uint16_t _reverseDuration;
     uint16_t _safetyDelay;
     uint16_t _scanTurnTimeout;
 
     int _turnFrontThreshold;
-    int _turnSideThreshold;
     int _stopThreshold;
     int _margin;
 
@@ -192,6 +183,14 @@ private:
 
     unsigned long _stateStartedAt = 0;
     unsigned long _lastSensorUpdate = 0;
+
+    // Wird beim Anheben (floor == true) auf false gesetzt und erst
+    // scharf geschaltet, sobald der Boden danach wieder erkannt wird.
+    // Erst dann beginnt der _safetyDelay-Timer zu laufen (siehe
+    // _updateEmergencyStop()) - so wartet der Roboter immer die volle
+    // Verzoegerung NACH dem Wiederaufsetzen, unabhaengig davon wie
+    // lange er vorher in der Luft war.
+    bool _emergencyRecoveryArmed = false;
 
 
     // ---------------------------------------------------------
@@ -211,8 +210,6 @@ private:
     void _updateDriving();
     void _updateBlockedReverse();
     void _updateBlockedScanAndTurn();
-    void _updateFloorReverse();
-    void _updateFloorTurn();
     void _updateEmergencyStop();
 
 
@@ -226,12 +223,7 @@ private:
     void _startBlockedReverse();
     void _startBlockedScanAndTurn();
 
-
-    /**
-     * Start the floor/edge avoidance sequence.
-     */
-    void _startFloorAvoidance();
-    
+   
     // ---------------------------------------------------------
     // Motion
     // ---------------------------------------------------------

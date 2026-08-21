@@ -352,11 +352,11 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
     <div class="card">
       <div class="param-row">
         <span class="param-label">Turn-Schwelle (cm)</span>
-        <input type="number" id="p-turn" min="1" max="400" value="100">
+        <input type="number" id="p-turn" min="1" max="400">
       </div>
       <div class="param-row">
         <span class="param-label">Stop-Schwelle (cm)</span>
-        <input type="number" id="p-stop" min="1" max="400" value="30">
+        <input type="number" id="p-stop" min="1" max="400">
       </div>
     </div>
     <button class="btn btn-param" onclick="paramSenden()">↺ Parameter übernehmen</button>
@@ -416,8 +416,10 @@ async function paramSenden() {
 // ── Status-Parser ────────────────────────────────────────────
 // Erwartet: "State:N Turn:N Stop:N Speed:N M:N L:N R:N BTM:N"
 
-const STATE_LABELS = ['INIT', 'READY', 'RUN', 'STOP'];
-const STATE_CLASSES = ['badge-init', 'badge-ready', 'badge-run', 'badge-stop'];
+// Robot::State kennt nur INIT(0) / READY(1) / RUN(2) – siehe Robot.h.
+// Ein vierter Eintrag waere hier nie erreichbar und wurde entfernt.
+const STATE_LABELS = ['INIT', 'READY', 'RUN'];
+const STATE_CLASSES = ['badge-init', 'badge-ready', 'badge-run'];
 
 function parseStatus(raw) {
   const kv = {};
@@ -435,12 +437,33 @@ function distColor(v) {
   return 'ok';
 }
 
+// ── Parameter-Felder mit der Firmware synchron halten ────────
+// Einzige Quelle der Wahrheit ist der laufende Wert aus /status
+// (letztlich Config.h bzw. der zuletzt per /parameter gesetzte
+// Wert). Kein hartkodierter Default mehr im HTML noetig - damit
+// kann keine Diskrepanz zwischen Firmware und UI mehr entstehen,
+// auch nicht wenn sich die Config.h-Defaults spaeter aendern.
+//
+// Waehrend der Nutzer gerade in einem Feld tippt (Fokus aktiv),
+// wird der Wert nicht ueberschrieben, damit das Polling alle
+// 800ms die Eingabe nicht kaputt macht.
+function syncParamField(id, value) {
+  if (value === undefined) return;
+  const el = $(id);
+  if (document.activeElement === el) return;
+  el.value = value;
+}
+
 function updateUI(kv) {
   // Zustandsbadge
-  const stateIdx = isNaN(kv.State) ? 0 : Math.min(kv.State, 3);
+  const stateIdx = isNaN(kv.State) ? 0 : Math.min(kv.State, STATE_LABELS.length - 1);
   const badge = $('state-badge');
   badge.textContent = STATE_LABELS[stateIdx];
-  badge.className = 'badge-' + ['init','ready','run','stop'][stateIdx];
+  badge.className = STATE_CLASSES[stateIdx];
+
+  // Parameter-Felder (Turn/Stop-Schwelle) live synchronisieren
+  syncParamField('p-turn', kv.Turn);
+  syncParamField('p-stop', kv.Stop);
 
   // Distanzen
   ['m', 'l', 'r'].forEach(dir => {

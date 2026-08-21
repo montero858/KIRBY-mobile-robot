@@ -47,7 +47,6 @@ public:
     // --------------------------------------------------------
     void onStart    (VoidCb   cb) { _cbStart  = cb; }
     void onStop     (VoidCb   cb) { _cbStop   = cb; }
-    void onScan     (VoidCb   cb) { _cbScan   = cb; }
     void onStufe    (IntCb    cb) { _cbStufe  = cb; }
     void onParameter(ParamCb  cb) { _cbParam  = cb; }
     void onStatus   (StringCb cb) { _cbStatus = cb; }
@@ -64,7 +63,6 @@ private:
 
     VoidCb    _cbStart;
     VoidCb    _cbStop;
-    VoidCb    _cbScan;
     IntCb     _cbStufe;
     ParamCb   _cbParam;
     StringCb  _cbStatus;

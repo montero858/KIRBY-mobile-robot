@@ -50,7 +50,9 @@ void Robot::begin() {
     // Display
     if (!_display.begin()) {
         Serial.println(F("[Robot] FEHLER: Display nicht gefunden"));
-        for (;;);  // Ohne Display nicht weiterfahren
+        for (;;) {
+            delay(1000);   // Yield an den Idle-Task -> verhindert Task-Watchdog-Reset
+        }
     }
     _display.show("Initialisierung");
 
