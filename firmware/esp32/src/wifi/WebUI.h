@@ -1,10 +1,10 @@
 // ============================================================
 //  WebUI.h
-//  HTML-Steuerseite fuer den KIRBY-Roboter.
-//  Wird von WiFiController.cpp eingebunden und als Antwort
-//  auf GET / gesendet.
+//  HTML control page for the KIRBY robot.
+//  Included by WiFiController.cpp and sent as the response
+//  to GET /.
 //
-//  Endpunkte die das Interface nutzt:
+//  Endpoints used by the interface:
 //    GET  /start
 //    GET  /stopp
 //    GET  /stufe?n=1..4
@@ -57,7 +57,7 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
     margin-bottom: 4px;
   }
 
-  /* ── Status-Karte ── */
+  /* ── Status card ── */
   .card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -141,7 +141,7 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
   .btn-start { background: var(--green); color: #fff; }
   .btn-stop  { background: var(--dim);   color: var(--text); }
 
-  /* ── Geschwindigkeitsstufen ── */
+  /* ── Speed levels ── */
   .speed-btns {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -171,7 +171,7 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
 
   .speed-btn:active { transform: scale(0.95); }
 
-  /* ── Parameter ── */
+  /* ── Parameters ── */
   .param-row {
     display: flex;
     justify-content: space-between;
@@ -230,12 +230,12 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
     padding-left: 4px;
   }
 
-  /* ── Queerformat (Landschaft) ──────────────────────────────
-     .layout/.col/.btn-row wirken im Hochformat als "display:
-     contents" – die Elemente bleiben direkte Flex-Kinder des
-     body und die Reihenfolge/Optik ist unveraendert zur
-     bisherigen Hochformat-Ansicht. Erst die Media-Query unten
-     aktiviert das Zweispalten-Layout fuer flache Bildschirme. */
+  /* ── Landscape orientation ──────────────────────────────
+     .layout/.col/.btn-row behave as "display: contents" in
+     portrait mode – the elements remain direct flex children
+     of body and the order/appearance is unchanged from the
+     previous portrait view. Only the media query below
+     activates the two-column layout for wide/flat screens. */
   .layout,
   .col,
   .btn-row {
@@ -308,7 +308,7 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
 <div class="layout">
 
   <div class="col col-status">
-    <!-- Status-Karte -->
+    <!-- Status card -->
     <div class="card">
       <div class="card-title">Status
       <span id="state-badge" class="badge-init">INIT</span>
@@ -331,14 +331,14 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
   </div>
 
   <div class="col col-controls">
-    <!-- Steuerung -->
+    <!-- Controls -->
     <span class="section-label">Steuerung</span>
     <div class="btn-row">
       <button class="btn btn-start" onclick="sende('/start')">Start</button>
       <button class="btn btn-stop"  onclick="sende('/stopp')">Stopp</button>
     </div>
 
-    <!-- Geschwindigkeitsstufen -->
+    <!-- Speed levels -->
     <span class="section-label">Geschwindigkeit</span>
     <div class="speed-btns">
       <button class="speed-btn aktiv" id="s1" onclick="setzeStufe(1)">1</button>
@@ -347,7 +347,7 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
       <button class="speed-btn"       id="s4" onclick="setzeStufe(4)">4</button>
     </div>
 
-    <!-- Parameter -->
+    <!-- Parameters -->
     <span class="section-label">Abstimmung</span>
     <div class="card">
       <div class="param-row">
@@ -367,7 +367,7 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
 </div>
 
 <script>
-// ── Hilfsfunktionen ──────────────────────────────────────────
+// ── Helper functions ────────────────────────────────────────
 
 const $ = id => document.getElementById(id);
 
@@ -386,7 +386,7 @@ async function sende(pfad) {
   }
 }
 
-// ── Geschwindigkeitsstufen ───────────────────────────────────
+// ── Speed levels ──────────────────────────────────────────────
 
 async function setzeStufe(n) {
   try {
@@ -400,7 +400,7 @@ async function setzeStufe(n) {
   }
 }
 
-// ── Parameter senden ─────────────────────────────────────────
+// ── Send parameters ──────────────────────────────────────────
 
 async function paramSenden() {
   const turn = $('p-turn').value;
@@ -413,11 +413,11 @@ async function paramSenden() {
   }
 }
 
-// ── Status-Parser ────────────────────────────────────────────
-// Erwartet: "State:N Turn:N Stop:N Speed:N M:N L:N R:N BTM:N"
+// ── Status parser ────────────────────────────────────────────
+// Expects: "State:N Turn:N Stop:N Speed:N M:N L:N R:N BTM:N"
 
-// Robot::State kennt nur INIT(0) / READY(1) / RUN(2) – siehe Robot.h.
-// Ein vierter Eintrag waere hier nie erreichbar und wurde entfernt.
+// Robot::State only knows INIT(0) / READY(1) / RUN(2) – see Robot.h.
+// A fourth entry would never be reachable here and has been removed.
 const STATE_LABELS = ['INIT', 'READY', 'RUN'];
 const STATE_CLASSES = ['badge-init', 'badge-ready', 'badge-run'];
 
@@ -437,16 +437,16 @@ function distColor(v) {
   return 'ok';
 }
 
-// ── Parameter-Felder mit der Firmware synchron halten ────────
-// Einzige Quelle der Wahrheit ist der laufende Wert aus /status
-// (letztlich Config.h bzw. der zuletzt per /parameter gesetzte
-// Wert). Kein hartkodierter Default mehr im HTML noetig - damit
-// kann keine Diskrepanz zwischen Firmware und UI mehr entstehen,
-// auch nicht wenn sich die Config.h-Defaults spaeter aendern.
+// ── Keep parameter fields in sync with the firmware ──────────
+// The single source of truth is the live value from /status
+// (ultimately Config.h, or the value most recently set via
+// /parameter). No hardcoded default needed in the HTML anymore -
+// this way no discrepancy between firmware and UI can arise,
+// even if the Config.h defaults change later on.
 //
-// Waehrend der Nutzer gerade in einem Feld tippt (Fokus aktiv),
-// wird der Wert nicht ueberschrieben, damit das Polling alle
-// 800ms die Eingabe nicht kaputt macht.
+// While the user is currently typing in a field (has focus),
+// the value is not overwritten, so the 800ms polling doesn't
+// clobber the input.
 function syncParamField(id, value) {
   if (value === undefined) return;
   const el = $(id);
@@ -455,17 +455,17 @@ function syncParamField(id, value) {
 }
 
 function updateUI(kv) {
-  // Zustandsbadge
+  // State badge
   const stateIdx = isNaN(kv.State) ? 0 : Math.min(kv.State, STATE_LABELS.length - 1);
   const badge = $('state-badge');
   badge.textContent = STATE_LABELS[stateIdx];
   badge.className = STATE_CLASSES[stateIdx];
 
-  // Parameter-Felder (Turn/Stop-Schwelle) live synchronisieren
+  // Synchronize parameter fields (turn/stop threshold) live
   syncParamField('p-turn', kv.Turn);
   syncParamField('p-stop', kv.Stop);
 
-  // Distanzen
+  // Distances
   ['m', 'l', 'r'].forEach(dir => {
     const el = $('dist-' + dir);
     const key = dir.toUpperCase();
@@ -475,9 +475,9 @@ function updateUI(kv) {
     el.className = 'sensor-value ' + distColor(v);
   });
 
-  // Aktive Stufe ermitteln
+  // Determine active level
   const speed = kv.Speed;
-  const levels = [165, 195, 225, 255];
+  const levels = [135, 165, 195, 225];
   const activeLevel = levels.indexOf(speed) + 1;
   if (activeLevel > 0) {
     for (let i = 1; i <= 4; i++) {
@@ -486,7 +486,7 @@ function updateUI(kv) {
   }
 }
 
-// ── Auto-Refresh alle 800ms ──────────────────────────────────
+// ── Auto-refresh every 800ms ─────────────────────────────────
 
 async function refresh() {
   try {
@@ -494,12 +494,12 @@ async function refresh() {
     const t = await r.text();
     updateUI(parseStatus(t));
   } catch(e) {
-    // Verbindung kurz unterbrochen – keine Fehlermeldung anzeigen
+    // Connection briefly interrupted – don't show an error message
   }
 }
 
 setInterval(refresh, 800);
-refresh(); // sofort beim Laden
+refresh(); // immediately on load
 </script>
 </body>
 </html>

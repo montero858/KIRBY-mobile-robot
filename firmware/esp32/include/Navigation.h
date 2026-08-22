@@ -1,11 +1,11 @@
 // ============================================================
 //  Navigation.h
-//  Reaktive Fahrlogik: Sensorauswertung, Geschwindigkeits-
-//  regelung und Ausweichroutinen.
+//  Reactive driving logic: sensor evaluation, speed control
+//  and avoidance routines.
 //
-//  Navigation kennt weder Display noch Robot – Rueckmeldungen
-//  erfolgen ausschliesslich ueber Callbacks:
-//    DisplayCallback   – Statustext ans Display
+//  Navigation knows neither Display nor Robot – feedback is
+//  provided exclusively via callbacks:
+//    DisplayCallback   – status text to the display
 // ============================================================
 
 #pragma once
@@ -20,7 +20,7 @@
 class Navigation {
 public:
     using DisplayCallback = std::function<void(const String&)>;
-    using StuckCallback   = std::function<void()>;   // wird bei Timeout in BLOCKED_SCAN_TURN aufgerufen
+    using StuckCallback   = std::function<void()>;   // called on timeout in BLOCKED_SCAN_TURN
 
     // ---------------------------------------------------------
     // Navigation states
@@ -100,15 +100,15 @@ public:
 
 
     // --------------------------------------------------------
-    //  Fahrparameter (per Web-UI aenderbar)
+    //  Driving parameters (changeable via web UI)
     // --------------------------------------------------------
     void    setMaxSpeed     (uint8_t v) { _maxSpeed      = constrain(v, 0, 255); }
 
-    // setTurnFrontThreshold()/setStopThreshold() stellen sicher, dass
-    // _turnFrontThreshold > _stopThreshold bleibt, unabhaengig von der
-    // Reihenfolge, in der beide Werte (z.B. per Web-UI) gesetzt werden.
-    // Andernfalls wuerde _calcSpeed() durch ein negatives oder Null-
-    // "range" fehlerhafte Geschwindigkeiten berechnen.
+    // setTurnFrontThreshold()/setStopThreshold() make sure that
+    // _turnFrontThreshold > _stopThreshold always holds, regardless of
+    // the order in which the two values are set (e.g. via the web UI).
+    // Otherwise _calcSpeed() would compute incorrect speeds due to a
+    // negative or zero "range".
     void    setTurnFrontThreshold(int     v) { _turnFrontThreshold = max(v, _stopThreshold + 1); }
     void    setStopThreshold(int     v) {
         _stopThreshold = v;
@@ -123,7 +123,7 @@ public:
 
 
     // --------------------------------------------------------
-    //  Sensorwerte (fuer Webendpoint /status)
+    //  Sensor values (for the /status web endpoint)
     // --------------------------------------------------------
     
     int  distanceCenter();
@@ -184,12 +184,11 @@ private:
     unsigned long _stateStartedAt = 0;
     unsigned long _lastSensorUpdate = 0;
 
-    // Wird beim Anheben (floor == true) auf false gesetzt und erst
-    // scharf geschaltet, sobald der Boden danach wieder erkannt wird.
-    // Erst dann beginnt der _safetyDelay-Timer zu laufen (siehe
-    // _updateEmergencyStop()) - so wartet der Roboter immer die volle
-    // Verzoegerung NACH dem Wiederaufsetzen, unabhaengig davon wie
-    // lange er vorher in der Luft war.
+    // Set to false when lifted (floor == true) and only armed once the
+    // floor is detected again afterwards. Only then does the
+    // _safetyDelay timer start running (see _updateEmergencyStop()) -
+    // this way the robot always waits the full delay AFTER touching
+    // down again, regardless of how long it was in the air before.
     bool _emergencyRecoveryArmed = false;
 
 

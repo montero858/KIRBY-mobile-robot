@@ -8,7 +8,7 @@
 using namespace Config;
 
 // ============================================================
-//  Konstruktor
+//  Constructor
 // ============================================================
 
 Navigation::Navigation(MotorDriver&      motor,
@@ -33,7 +33,7 @@ Navigation::Navigation(MotorDriver&      motor,
 }
 
 // ============================================================
-//  Interne Hilfsfunktionen und Parameter
+//  Internal helper functions and parameters
 // ============================================================
 
 void Navigation::_display(const String& text) {
@@ -41,15 +41,15 @@ void Navigation::_display(const String& text) {
 }
 
 // ============================================================
-//  update() – ein Navigations-Zyklus
+//  update() – one navigation cycle
 // ============================================================
 
 void Navigation::update() {
     /*
-     * Sensoren nur periodisch aktualisieren.
+     * Only update sensors periodically.
      *
-     * Dadurch wird nicht in jedem loop()-Durchlauf eine
-     * komplette Ultraschallmessung durchgeführt.
+     * This avoids performing a full ultrasonic measurement on
+     * every loop() iteration.
      */
 
     constexpr unsigned long SENSOR_INTERVAL_MS = 80;
@@ -60,10 +60,10 @@ void Navigation::update() {
     }
 
     if (_sensors.floor) {
-        // Roboter angehoben: sofort stoppen, Zustand EMERGENCY_STOP.
-        // Der Recovery-Timer wird bewusst noch NICHT gestartet - das
-        // passiert erst in _updateEmergencyStop(), sobald der Boden
-        // wieder erkannt wird (_sensors.floor == false).
+        // Robot has been lifted: stop immediately, state EMERGENCY_STOP.
+        // The recovery timer is deliberately NOT started yet - that
+        // happens in _updateEmergencyStop() only once the floor is
+        // detected again (_sensors.floor == false).
         if (_state != State::EMERGENCY_STOP) {
             _transitionTo(State::EMERGENCY_STOP);
         }
@@ -81,7 +81,7 @@ void Navigation::update() {
 }
 
 // ============================================================
-// Sensoren abfragen
+// Read sensors
 // ============================================================
 
 void Navigation::_updateSensors() {
@@ -131,7 +131,7 @@ void Navigation::_updateDriving() {
 }
 
 // ============================================================
-// Blockage situaton - reverse
+// Blocked situation - reverse
 // ============================================================
 
 void Navigation::_startBlockedReverse() {
@@ -149,7 +149,7 @@ void Navigation::_updateBlockedReverse() {
 }
 
 // ============================================================
-// Blockage situation - scan and turn
+// Blocked situation - scan and turn
 // ============================================================
 
 void Navigation::_startBlockedScanAndTurn() {
@@ -171,12 +171,12 @@ void Navigation::_startBlockedScanAndTurn() {
 
 void Navigation::_updateBlockedScanAndTurn() {
 
-    // Timeout: Falls trotz Drehen keine Richtung frei wird (z.B. in
-    // einer Ecke gefangen), erneut zurücksetzen statt endlos zu drehen.
+    // Timeout: if no direction becomes free despite turning (e.g.
+    // trapped in a corner), back up again instead of spinning forever.
     if (_stateElapsed(_scanTurnTimeout)) {
         _motor.stop();
         _display("Kein Weg frei");
-        _transitionTo(State::DRIVING);   // sauberer Ausgangszustand für den nächsten Start
+        _transitionTo(State::DRIVING);   // clean starting state for the next start
         if (_stuckCb) _stuckCb();
         return;
     }
@@ -199,12 +199,12 @@ void Navigation::_updateBlockedScanAndTurn() {
 
 void Navigation::_updateEmergencyStop() {
     _motor.stop();
-    // Diese Funktion wird nur erreicht, wenn floorBottom bereits false ist
-    // (siehe update()) – die frühere Prüfung hier war unerreichbar.
+    // This function is only reached once floorBottom is already false
+    // (see update()) – the earlier check here was unreachable.
 
     if (!_emergencyRecoveryArmed) {
-        // Boden gerade wieder erkannt: Delay ab JETZT zaehlen,
-        // nicht ab dem Zeitpunkt des Anhebens.
+        // Floor detected again just now: start counting the delay
+        // from NOW, not from the moment the robot was lifted.
         _stateStartedAt = millis();
         _emergencyRecoveryArmed = true;
         return;
@@ -217,10 +217,17 @@ void Navigation::_updateEmergencyStop() {
 }
 
 // ============================================================
-// Geschwindigkeit
+// Speed
 // ============================================================
 
 uint8_t Navigation::_calcSpeed(int distanceCm) const {
+
+    // Invalid measurement (timeout / outside the measurement range):
+    // do NOT treat as "path clear" (999 >= _turnFrontThreshold would
+    // otherwise incorrectly result in full speed); instead treat it
+    // safely like a near/uncertain distance -> slow driving.
+    if (distanceCm == UltrasonicSensor::INVALID_DISTANCE)
+        return NavigationCfg::SPEED_SLOW;
 
     if (distanceCm >= _turnFrontThreshold)
         return _maxSpeed;
@@ -252,7 +259,7 @@ uint8_t Navigation::_calcSpeed(int distanceCm) const {
 }
 
 // ============================================================
-//  _transitionTo() – Zustandswechsel
+//  _transitionTo() – state change
 // ============================================================
 
 void Navigation::_transitionTo(State next) {
@@ -268,7 +275,7 @@ bool Navigation::_stateElapsed(unsigned long duration) const {
 }
 
 // ============================================================
-// Sensorabfragen für Webendpoint /status
+// Sensor queries for the /status web endpoint
 // ============================================================
 int Navigation::distanceCenter() {
     return _sensors.center;

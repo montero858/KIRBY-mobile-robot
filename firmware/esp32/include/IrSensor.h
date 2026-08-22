@@ -1,21 +1,21 @@
 // ============================================================
 //  IrSensor.h
-//  Abstraktion für TCRT5000-basierte IR-Reflexionssensoren
+//  Abstraction for TCRT5000-based IR reflectance sensors
 //
-//  Unterstützt zwei semantisch gegensätzliche Betriebsmodi:
+//  Supports two semantically opposite operating modes:
 //
-//  Mode::OBSTACLE  – Alarm wenn Reflexion erkannt wird
-//                    (Objekt in der Nähe)
-//                    Typische Verwendung: seitliche Hindernisse
+//  Mode::OBSTACLE  – Alarm when reflection is detected
+//                    (object nearby)
+//                    Typical use: side obstacles
 //
-//  Mode::FLOOR     – Alarm wenn KEINE Reflexion erkannt wird
-//                    (kein Boden vorhanden = Absturzgefahr!)
-//                    Typische Verwendung: Tischkanten-Schutz
+//  Mode::FLOOR     – Alarm when NO reflection is detected
+//                    (no floor present = risk of falling!)
+//                    Typical use: edge/cliff protection
 //
-//  Entstörung: isTriggered() wertet zwei aufeinanderfolgende
-//  Lesungen aus. Beide müssen übereinstimmen, damit ein Alarm
-//  als gültig gilt. Dies verhindert Fehlauslösungen durch
-//  kurze Störimpulse.
+//  Debouncing: isTriggered() evaluates two consecutive
+//  readings. Both must agree for an alarm to be considered
+//  valid. This prevents false triggers from brief noise
+//  spikes.
 // ============================================================
 
 #pragma once
@@ -24,42 +24,42 @@
 
 class IrSensor {
 public:
-    // Betriebsmodus
+    // Operating mode
     enum class Mode {
-        OBSTACLE,   // Alarm wenn Reflexion da (Objekt nah)
-        FLOOR       // Alarm wenn keine Reflexion (kein Boden)
+        OBSTACLE,   // Alarm when reflection present (object nearby)
+        FLOOR       // Alarm when no reflection (no floor)
     };
 
     // --------------------------------------------------------
-    //  Konstruktor
-    //  pin            : GPIO-Pin (Input)
-    //  mode           : OBSTACLE oder FLOOR (s.o.)
-    //  reflectionLevel: elektrischer Pegel bei Reflexion
-    //                   (TCRT5000 typisch: LOW)
-    //  debounceUs     : Pause zwischen den zwei Entstörungs-
-    //                   Lesungen in Mikrosekunden (default 500)
+    //  Constructor
+    //  pin            : GPIO pin (input)
+    //  mode           : OBSTACLE or FLOOR (see above)
+    //  reflectionLevel: electrical level on reflection
+    //                   (TCRT5000 typically: LOW)
+    //  debounceUs     : delay between the two debouncing
+    //                   readings in microseconds (default 500)
     // --------------------------------------------------------
     IrSensor(uint8_t pin, Mode mode,
              uint8_t reflectionLevel = LOW,
              uint16_t debounceUs = 500);
 
-    // Pin als Input initialisieren
+    // Initialize pin as input
     void begin();
 
     // --------------------------------------------------------
-    //  isTriggered()  – Entstörte Abfrage
-    //  Gibt true zurück wenn der Sensor einen Alarm-Zustand
-    //  meldet (Bedeutung je nach Mode, s.o.).
-    //  Zwei aufeinanderfolgende Lesungen müssen übereinstimmen.
+    //  isTriggered()  – Debounced query
+    //  Returns true if the sensor reports an alarm state
+    //  (meaning depends on Mode, see above).
+    //  Two consecutive readings must agree.
     // --------------------------------------------------------
     bool isTriggered();
 
     // --------------------------------------------------------
-    //  rawReflection()  – Ungefilterte Einzellesung
-    //  Gibt true zurück wenn eine Reflexion erkannt wird
-    //  (Boden/Objekt vorhanden), unabhängig vom Mode.
-    //  Geeignet für Statusanzeigen, nicht für sicherheits-
-    //  relevante Entscheidungen.
+    //  rawReflection()  – Unfiltered single reading
+    //  Returns true if a reflection is detected
+    //  (floor/object present), regardless of Mode.
+    //  Suitable for status displays, not for safety-critical
+    //  decisions.
     // --------------------------------------------------------
     bool rawReflection();
 

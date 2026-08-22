@@ -5,7 +5,7 @@
 #include "MotorDriver.h"
 
 // ============================================================
-//  Konstruktor
+//  Constructor
 // ============================================================
 
 MotorDriver::MotorDriver(uint8_t in1, uint8_t in2,
@@ -39,8 +39,8 @@ void MotorDriver::begin() {
 }
 
 // ============================================================
-//  Interner Kanal-Setter
-//  speed: -255 bis +255
+//  Internal channel setter
+//  speed: -255 to +255
 // ============================================================
 
 void MotorDriver::_setChannel(uint8_t in1, uint8_t in2,
@@ -64,8 +64,8 @@ void MotorDriver::_setChannel(uint8_t in1, uint8_t in2,
 
 // ============================================================
 //  setMotors()
-//  Hauptmethode: setzt beide Kanäle mit Zustandscaching.
-//  Schreibt GPIO/LEDC nur wenn sich ein Wert geändert hat.
+//  Main method: sets both channels with state caching.
+//  Only writes GPIO/LEDC when a value has actually changed.
 // ============================================================
 
 void MotorDriver::setMotors(int speedA, int speedB) {
@@ -83,7 +83,7 @@ void MotorDriver::setMotors(int speedA, int speedB) {
 }
 
 // ============================================================
-//  Komfortmethoden
+//  Convenience methods
 // ============================================================
 
 void MotorDriver::stop() {
@@ -99,21 +99,21 @@ void MotorDriver::backward(uint8_t speed) {
 }
 
 void MotorDriver::turnLeft(uint8_t speed) {
-    // Pivotdrehung links: linkes Rad rückwärts, rechtes vorwärts
+    // Pivot turn left: left wheel backward, right wheel forward
     setMotors(-(int)speed, (int)speed);
 }
 
 void MotorDriver::turnRight(uint8_t speed) {
-    // Pivotdrehung rechts: linkes Rad vorwärts, rechtes rückwärts
+    // Pivot turn right: left wheel forward, right wheel backward
     setMotors((int)speed, -(int)speed);
 }
 
 void MotorDriver::curveLeft(uint8_t outerSpeed, uint8_t innerSpeed) {
-    // Kurve links: rechtes Rad außen (schnell), linkes Rad innen (langsam)
+    // Curve left: right wheel outer (fast), left wheel inner (slow)
     setMotors((int)innerSpeed, (int)outerSpeed);
 }
 
 void MotorDriver::curveRight(uint8_t outerSpeed, uint8_t innerSpeed) {
-    // Kurve rechts: linkes Rad außen (schnell), rechtes Rad innen (langsam)
+    // Curve right: left wheel outer (fast), right wheel inner (slow)
     setMotors((int)outerSpeed, (int)innerSpeed);
 }

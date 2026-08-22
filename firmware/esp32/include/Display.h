@@ -1,8 +1,8 @@
 // ============================================================
 //  Display.h
-//  Wrapper um den SSD1306 OLED-Treiber.
-//  Schreibt nur dann neu auf das Display, wenn sich der
-//  angezeigte Text tatsaechlich geaendert hat.
+//  Wrapper around the SSD1306 OLED driver.
+//  Only redraws the display when the displayed text has
+//  actually changed.
 // ============================================================
 
 #pragma once
@@ -15,25 +15,25 @@
 class Display {
 public:
     // --------------------------------------------------------
-    //  Konstruktor
-    //  sda/scl   : I2C-Pins
-    //  i2cAddr   : I2C-Adresse (typisch 0x3C)
-    //  width/height: Aufloesung in Pixeln
+    //  Constructor
+    //  sda/scl   : I2C pins
+    //  i2cAddr   : I2C address (typically 0x3C)
+    //  width/height: resolution in pixels
     // --------------------------------------------------------
     Display(uint8_t sda, uint8_t scl,
             uint8_t i2cAddr  = 0x3C,
             uint8_t width    = 128,
             uint8_t height   = 64);
 
-    // Hardware und I2C initialisieren.
-    // Gibt false zurueck wenn das Display nicht antwortet.
+    // Initialize hardware and I2C.
+    // Returns false if the display does not respond.
     bool begin();
 
-    // Text anzeigen (mehrzeilig mit '\n' moeglich).
-    // Kein Neuzeichnen wenn Text unveraendert.
+    // Show text (multi-line via '\n' possible).
+    // No redraw if the text is unchanged.
     void show(const String& text);
 
-    // Display leeren (ohne Zustandspruefung).
+    // Clear the display (without checking state).
     void clear();
 
 private:

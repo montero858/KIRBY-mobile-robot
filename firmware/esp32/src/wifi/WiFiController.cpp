@@ -7,7 +7,7 @@
 #include "Config.h"
 
 // ============================================================
-//  Konstruktor
+//  Constructor
 // ============================================================
 
 WiFiController::WiFiController(const char* ssid,
@@ -41,7 +41,7 @@ void WiFiController::handle() {
 
 // ============================================================
 //  _setupRoutes()
-//  Alle HTTP-Endpunkte mit Callbacks verdrahten.
+//  Wire up all HTTP endpoints with callbacks.
 // ============================================================
 
 void WiFiController::_setupRoutes() {

@@ -1,13 +1,13 @@
 // ============================================================
 //  WiFiController.h
-//  Verwaltet WLAN-Access-Point und HTTP-Webserver.
+//  Manages the WiFi access point and HTTP web server.
 //
-//  Die Klasse kennt weder Robot noch Navigation direkt –
-//  Befehle werden ueber registrierte Callbacks weitergeleitet.
-//  So entstehen keine zirkulaeren Abhaengigkeiten.
+//  This class knows neither Robot nor Navigation directly –
+//  commands are forwarded via registered callbacks.
+//  This avoids circular dependencies.
 //
-//  Robot registriert beim Start alle Callbacks, danach
-//  genuegt der regelmaessige Aufruf von handle() in loop().
+//  Robot registers all callbacks at startup; after that,
+//  it's enough to call handle() regularly in loop().
 // ============================================================
 
 #pragma once
@@ -20,7 +20,7 @@
 class WiFiController {
 public:
     // --------------------------------------------------------
-    //  Callback-Typen
+    //  Callback types
     // --------------------------------------------------------
     using VoidCb    = std::function<void()>;
     using IntCb     = std::function<void(int)>;
@@ -28,7 +28,7 @@ public:
     using ParamCb   = std::function<void(int turn, int stop)>;
 
     // --------------------------------------------------------
-    //  Konstruktor
+    //  Constructor
     // --------------------------------------------------------
     WiFiController(const char* ssid,
                    const char* password,
@@ -36,14 +36,14 @@ public:
                    bool        hidden     = false,
                    uint8_t     maxClients = 1);
 
-    // Access Point starten und Routen registrieren
+    // Start the access point and register routes
     void begin();
 
-    // Webserver-Anfragen abarbeiten (jeden loop()-Durchlauf aufrufen)
+    // Process web server requests (call on every loop() iteration)
     void handle();
 
     // --------------------------------------------------------
-    //  Callbacks registrieren (vor begin() aufrufen)
+    //  Register callbacks (call before begin())
     // --------------------------------------------------------
     void onStart    (VoidCb   cb) { _cbStart  = cb; }
     void onStop     (VoidCb   cb) { _cbStop   = cb; }

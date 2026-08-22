@@ -1,17 +1,17 @@
 // ============================================================
 //  Robot.h
-//  Oberste Schicht: Zustandsmaschine und Verdrahtung aller
-//  Subsysteme.
+//  Top-level layer: state machine and wiring of all
+//  subsystems.
 //
-//  Zustaende:
-//    INIT   – Hardware wird initialisiert (begin())
-//    READY  – Bereit, wartet auf Start-Befehl (Motoren aus)
-//    RUN    – Autonome Fahrt aktiv (Navigation::update())
+//  States:
+//    INIT   – hardware is being initialized (begin())
+//    READY  – ready, waiting for start command (motors off)
+//    RUN    – autonomous driving active (Navigation::update())
 //
-//  Erlaubte Uebergaenge:
-//    INIT  → READY  (automatisch nach begin())
-//    READY → RUN    (start() / Web /start)
-//    RUN   → READY  (stop()  / Web /stopp)
+//  Allowed transitions:
+//    INIT  → READY  (automatically after begin())
+//    READY → RUN    (start() / web /start)
+//    RUN   → READY  (stop()  / web /stopp)
 // ============================================================
 
 #pragma once
@@ -30,41 +30,41 @@ public:
 
     Robot();
 
-    // In Arduino setup() aufrufen.
-    // Initialisiert alle Subsysteme, geht danach nach READY.
+    // Call from Arduino setup().
+    // Initializes all subsystems, then transitions to READY.
     void begin();
 
-    // In Arduino loop() aufrufen.
+    // Call from Arduino loop().
     void update();
 
     // --------------------------------------------------------
-    //  Zustandsuebergaenge
+    //  State transitions
     // --------------------------------------------------------
     void start();         // READY → RUN
     void stop();          // RUN   → READY
 
     State state() const { return _state; }
 
-    // Navigation fuer Webserver-Callbacks oeffentlich zugaenglich
+    // Navigation exposed publicly for web server callbacks
     Navigation& navigation() { return _navigation; }
 
 private:
     State _state;
 
     // --------------------------------------------------------
-    //  Subsysteme
+    //  Subsystems
     // --------------------------------------------------------
     MotorDriver      _motor;
     UltrasonicSensor _sonarCenter;
     UltrasonicSensor _sonarLeft;
     UltrasonicSensor _sonarRight;
-    IrSensor         _irFloor;   // hoechste Prioritaet – Notstopp
+    IrSensor         _irFloor;   // highest priority – emergency stop
     Display          _display;
     Navigation       _navigation;
     WiFiController   _wifi;
 
     // --------------------------------------------------------
-    //  Zustandshandler (je ein Handler pro State)
+    //  State handlers (one handler per state)
     // --------------------------------------------------------
     void _handleInit();
     void _handleReady();
@@ -72,6 +72,6 @@ private:
 
     void _transitionTo(State next, const String& displayText = "");
 
-    // Verdrahtet Callbacks zwischen WiFiController und Robot
+    // Wires callbacks between WiFiController and Robot
     void _registerWifiCallbacks();
 };

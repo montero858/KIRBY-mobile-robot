@@ -1,7 +1,7 @@
 // ============================================================
 //  Robot.cpp
-//  Zustandsmaschine – keine Navigations- oder Anzeigelogik.
-//  Alle Fachlogik liegt in Navigation, Display, WiFiController.
+//  State machine – no navigation or display logic.
+//  All domain logic lives in Navigation, Display, WiFiController.
 // ============================================================
 
 #include "Robot.h"
@@ -10,7 +10,7 @@
 using namespace Config;
 
 // ============================================================
-//  Konstruktor – Subsysteme mit Config-Werten instantiieren
+//  Constructor – instantiate subsystems with Config values
 // ============================================================
 
 Robot::Robot()
@@ -40,8 +40,8 @@ Robot::Robot()
 
 // ============================================================
 //  begin()
-//  Wird einmalig in setup() aufgerufen.
-//  Initialisiert alle Subsysteme → Uebergang nach READY.
+//  Called once in setup().
+//  Initializes all subsystems -> transition to READY.
 // ============================================================
 
 void Robot::begin() {
@@ -51,17 +51,17 @@ void Robot::begin() {
     if (!_display.begin()) {
         Serial.println(F("[Robot] FEHLER: Display nicht gefunden"));
         for (;;) {
-            delay(1000);   // Yield an den Idle-Task -> verhindert Task-Watchdog-Reset
+            delay(1000);   // yield to the idle task -> prevents task watchdog reset
         }
     }
     _display.show("Initialisierung");
 
-    // Navigation: Callbacks registrieren
+    // Navigation: register callbacks
     _navigation.setDisplayCallback([this](const String& text) {
         _display.show(text);
     });
 
-    // Treiber
+    // Drivers
     _motor.begin();
     _sonarCenter.begin();
     _sonarLeft.begin();
@@ -70,7 +70,7 @@ void Robot::begin() {
 
     delay(500);
 
-    // WiFi: Callbacks registrieren, dann starten
+    // WiFi: register callbacks, then start
     _registerWifiCallbacks();
     _wifi.begin();
 
@@ -79,7 +79,7 @@ void Robot::begin() {
 
 // ============================================================
 //  update()
-//  Wird in jedem loop()-Durchlauf aufgerufen.
+//  Called on every loop() iteration.
 // ============================================================
 
 void Robot::update() {
@@ -93,17 +93,17 @@ void Robot::update() {
 }
 
 // ============================================================
-//  Zustandshandler
+//  State handlers
 // ============================================================
 
 void Robot::_handleInit() {
-    // INIT wird in begin() abgehandelt.
-    // Falls update() vor begin() aufgerufen wird, nichts tun.
+    // INIT is handled in begin().
+    // If update() is called before begin(), do nothing.
 }
 
 void Robot::_handleReady() {
-    // Warten auf Start-Befehl (kommt ueber WiFi-Callback).
-    // Motoren bleiben gestoppt.
+    // Waiting for the start command (arrives via WiFi callback).
+    // Motors remain stopped.
 }
 
 void Robot::_handleRun() {
@@ -111,7 +111,7 @@ void Robot::_handleRun() {
 }
 
 // ============================================================
-//  Oeffentliche Zustandsuebergaenge
+//  Public state transitions
 // ============================================================
 
 void Robot::start() {
@@ -126,7 +126,7 @@ void Robot::stop() {
 }
 
 // ============================================================
-//  _transitionTo() – Zustandswechsel mit optionalem Display
+//  _transitionTo() – state change with optional display update
 // ============================================================
 
 void Robot::_transitionTo(State next, const String& displayText) {
@@ -140,8 +140,8 @@ void Robot::_transitionTo(State next, const String& displayText) {
 
 // ============================================================
 //  _registerWifiCallbacks()
-//  Verdrahtet WiFiController-Callbacks mit Robot-Methoden.
-//  Robot ist der einzige Ort, der beide kennt.
+//  Wires WiFiController callbacks to Robot methods.
+//  Robot is the only place that knows both.
 // ============================================================
 
 void Robot::_registerWifiCallbacks() {

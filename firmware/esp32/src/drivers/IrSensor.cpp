@@ -5,7 +5,7 @@
 #include "IrSensor.h"
 
 // ============================================================
-//  Konstruktor
+//  Constructor
 // ============================================================
 
 IrSensor::IrSensor(uint8_t pin, Mode mode,
@@ -26,9 +26,9 @@ void IrSensor::begin() {
 
 // ============================================================
 //  rawReflection()
-//  Einzellesung ohne Entstörung.
-//  Gibt true zurück wenn gerade eine Reflexion erkannt wird
-//  (Objekt oder Boden vorhanden), unabhängig vom Mode.
+//  Single reading without debouncing.
+//  Returns true if a reflection is currently detected
+//  (object or floor present), regardless of Mode.
 // ============================================================
 
 bool IrSensor::rawReflection() {
@@ -37,10 +37,10 @@ bool IrSensor::rawReflection() {
 
 // ============================================================
 //  isTriggered()
-//  Entstörte Abfrage: beide Lesungen müssen übereinstimmen.
+//  Debounced query: both readings must agree.
 //
-//  Mode::OBSTACLE: Alarm wenn Reflexion vorhanden (Objekt nah)
-//  Mode::FLOOR:    Alarm wenn KEINE Reflexion (kein Boden!)
+//  Mode::OBSTACLE: alarm when reflection is present (object nearby)
+//  Mode::FLOOR:    alarm when NO reflection (no floor!)
 // ============================================================
 
 bool IrSensor::isTriggered() {
@@ -48,20 +48,20 @@ bool IrSensor::isTriggered() {
     delayMicroseconds(_debounceUs);
     bool second = rawReflection();
 
-    // Beide Lesungen müssen identisch sein (Entstörung)
+    // Both readings must be identical (debouncing)
     if (first != second) {
-        return false;   // Instabiles Signal – kein Alarm
+        return false;   // unstable signal – no alarm
     }
 
     bool reflection = first;
 
     switch (_mode) {
         case Mode::OBSTACLE:
-            // Alarm wenn Reflexion erkannt wird (Objekt nah)
+            // Alarm when reflection is detected (object nearby)
             return reflection;
 
         case Mode::FLOOR:
-            // Alarm wenn KEINE Reflexion (Boden fehlt = Absturz!)
+            // Alarm when NO reflection (floor missing = fall risk!)
             return !reflection;
 
         default:

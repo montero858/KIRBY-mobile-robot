@@ -5,7 +5,7 @@
 #include "UltrasonicSensor.h"
 
 // ============================================================
-//  Konstruktor
+//  Constructor
 // ============================================================
 
 UltrasonicSensor::UltrasonicSensor(uint8_t trigPin, uint8_t echoPin,
@@ -29,12 +29,12 @@ void UltrasonicSensor::begin() {
 
 // ============================================================
 //  measureDistance()
-//  Sendet einen 10µs-TRIG-Impuls und misst die ECHO-Laufzeit.
-//  Umrechnung: Abstand [cm] = Laufzeit [µs] / 58
+//  Sends a 10µs TRIG pulse and measures the ECHO travel time.
+//  Conversion: distance [cm] = travel time [µs] / 58
 // ============================================================
 
 int UltrasonicSensor::measureDistance() {
-    // TRIG: sicherstellen dass vorher LOW war, dann 10µs HIGH
+    // TRIG: make sure it was LOW before, then 10µs HIGH
     digitalWrite(_trigPin, LOW);
     delayMicroseconds(2);
     digitalWrite(_trigPin, HIGH);
@@ -44,7 +44,7 @@ int UltrasonicSensor::measureDistance() {
     long duration = pulseIn(_echoPin, HIGH, _timeoutUs);
 
     if (duration == 0) {
-        // Timeout: kein Echo empfangen (Hindernis zu weit oder kein Objekt)
+        // Timeout: no echo received (obstacle too far or no object)
         _lastDistance = INVALID_DISTANCE;
         return INVALID_DISTANCE;
     }
@@ -62,8 +62,8 @@ int UltrasonicSensor::measureDistance() {
 
 // ============================================================
 //  measureAverage()
-//  Führt N Einzelmessungen durch und gibt den Mittelwert der
-//  gültigen Messwerte zurück. Ungültige Werte werden übersprungen.
+//  Performs N individual measurements and returns the average
+//  of the valid readings. Invalid readings are skipped.
 // ============================================================
 
 int UltrasonicSensor::measureAverage(uint8_t samples,

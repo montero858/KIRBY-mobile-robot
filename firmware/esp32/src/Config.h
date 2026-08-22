@@ -1,20 +1,20 @@
 // ============================================================
-//  Config.h – Zentrale Hardware- und Verhaltenskonfiguration
+//  Config.h – Central hardware and behavior configuration
 //
-//  Alle Pins, Schwellen und Fahrtparameter sind hier gebuendelt.
-//  Nur Robot.cpp und die jeweiligen Treiber-Konstruktoren
-//  lesen diese Werte – alle anderen Klassen bleiben frei davon.
+//  All pins, thresholds and driving parameters are bundled
+//  here. Only Robot.cpp and the respective driver constructors
+//  read these values – all other classes remain free of them.
 // ============================================================
 
 #pragma once
 
 #include <Arduino.h>
-#include "Secrets.h"   // SSID/PASSWORD – lokal, nicht versioniert (siehe Secrets.example.h)
+#include "Secrets.h"   // SSID/PASSWORD – local, not version-controlled (see Secrets.example.h)
 
 namespace Config {
 
     // --------------------------------------------------------
-    //  Motorsteuerung (L298N) – Seite B (3V3)
+    //  Motor control (L298N) – side B (3V3)
     // --------------------------------------------------------
     namespace Motor {
         constexpr uint8_t  IN1           = 4;
@@ -30,8 +30,8 @@ namespace Config {
     }
 
     // --------------------------------------------------------
-    //  Ultraschallsensoren HC-SR04 – Seite A (VIN)
-    //  ECHO-Pins ueber Logic Level Converter (5V → 3,3V)!
+    //  Ultrasonic sensors HC-SR04 – side A (VIN)
+    //  ECHO pins via logic level converter (5V → 3.3V)!
     // --------------------------------------------------------
     namespace Ultrasonic {
         constexpr uint8_t  TRIG_CENTER      = 27;
@@ -45,7 +45,7 @@ namespace Config {
     }
 
     // --------------------------------------------------------
-    //  IR-Sensoren TCRT5000 – Seite A (VIN, input-only Pins)
+    //  IR sensors TCRT5000 – side A (VIN, input-only pins)
     // --------------------------------------------------------
     namespace Ir {
         constexpr uint8_t  IR_FLOOR          = 13;
@@ -54,7 +54,7 @@ namespace Config {
     }
 
     // --------------------------------------------------------
-    //  Display SSD1306 (I2C) – Seite B (3V3)
+    //  Display SSD1306 (I2C) – side B (3V3)
     // --------------------------------------------------------
     namespace DisplayCfg {
         constexpr uint8_t SDA      = 21;
@@ -65,16 +65,16 @@ namespace Config {
     }
 
     // --------------------------------------------------------
-    //  Fahrverhalten
-    //  Namespace heisst NavigationCfg um Kollision mit der
-    //  Klasse Navigation zu vermeiden.
+    //  Driving behavior
+    //  Namespace is called NavigationCfg to avoid collision
+    //  with the Navigation class.
     // --------------------------------------------------------
     namespace NavigationCfg {
         constexpr int     FRONT_TURN_THRESHOLD_CM   = 80;
         constexpr int     SIDE_TURN_THRESHOLD_CM    = 40;
         constexpr int     STOP_THRESHOLD_CM         = 15;
         constexpr int     MARGIN_CM                 = 20;
-        constexpr uint8_t SPEED_MIN                 = 0;    // Minimum für enge Kurvenfahrt
+        constexpr uint8_t SPEED_MIN                 = 0;    // minimum for tight cornering
         constexpr uint8_t SPEED_SLOW                = 135;
         constexpr uint8_t SPEED_LEVEL_1             = 135;
         constexpr uint8_t SPEED_LEVEL_2             = 165;
@@ -82,14 +82,14 @@ namespace Config {
         constexpr uint8_t SPEED_LEVEL_4             = 225;
         constexpr uint16_t REVERSE_DURATION_MS      = 500;
         constexpr uint16_t SAFETY_DELAY_MS          = 2000;
-        constexpr uint16_t SCAN_TURN_TIMEOUT_MS     = 5000;   // Max. Drehzeit vor erneutem Zurücksetzen
+        constexpr uint16_t SCAN_TURN_TIMEOUT_MS     = 5000;   // max. turn time before backing up again
     }
 
     // --------------------------------------------------------
-    //  WLAN Access Point
+    //  WiFi access point
     // --------------------------------------------------------
     namespace Wifi {
-        // SSID und PASSWORD kommen aus Secrets.h (siehe Include oben)
+        // SSID and PASSWORD come from Secrets.h (see include above)
         constexpr uint8_t CHANNEL     = 1;
         constexpr bool    HIDDEN      = false;
         constexpr uint8_t MAX_CLIENTS = 1;
