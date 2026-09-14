@@ -77,10 +77,12 @@ void WiFiController::_setupRoutes() {
     _server.on("/parameter", [this]() {
         int turn = _server.hasArg("turn")
                    ? _server.arg("turn").toInt() : -1;
-        int stop = _server.hasArg("stop")
-                   ? _server.arg("stop").toInt() : -1;
+        int sideTurn = _server.hasArg("sideTurn")   
+                       ? _server.arg("sideTurn").toInt()   : -1;
+        int turnFactor = _server.hasArg("turnFactor") 
+                         ? _server.arg("turnFactor").toInt() : -1;
 
-        if (_cbParam) _cbParam(turn, stop);
+        if (_cbParam) _cbParam(turn, sideTurn, turnFactor);
         _server.send(200, "text/plain", "Parameter gesetzt");
     });
 

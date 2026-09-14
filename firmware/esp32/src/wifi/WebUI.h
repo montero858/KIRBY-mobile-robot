@@ -180,6 +180,11 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
     border-bottom: 1px solid var(--border);
   }
 
+  .param-row input[type=number]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   .param-row:last-child { border-bottom: none; }
 
   .param-label {
@@ -356,7 +361,15 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
       </div>
       <div class="param-row">
         <span class="param-label">Stop-Schwelle (cm)</span>
-        <input type="number" id="p-stop" min="1" max="400">
+        <input type="number" id="p-stop" min="1" max="400" readonly disabled>
+      </div>
+      <div class="param-row">
+        <span class="param-label">Seiten-Schwelle (cm)</span>
+        <input type="number" id="p-side" min="1" max="400">
+      </div>
+      <div class="param-row">
+        <span class="param-label">Kurvenfaktor (%)</span>
+        <input type="number" id="p-turnfactor" min="0" max="100">
       </div>
     </div>
     <button class="btn btn-param" onclick="paramSenden()">↺ Parameter übernehmen</button>
@@ -403,10 +416,11 @@ async function setzeStufe(n) {
 // ── Send parameters ──────────────────────────────────────────
 
 async function paramSenden() {
-  const turn = $('p-turn').value;
-  const stop = $('p-stop').value;
+  const turn       = $('p-turn').value;
+  const side       = $('p-side').value;
+  const turnFactor = $('p-turnfactor').value;
   try {
-    await fetch(`/parameter?turn=${turn}&stop=${stop}`);
+    await fetch(`/parameter?turn=${turn}&sideTurn=${side}&turnFactor=${turnFactor}`);
     feedback('Parameter gespeichert', '#1D9E75');
   } catch(e) {
     feedback('Fehler: ' + e, '#E24B4A');
@@ -464,6 +478,8 @@ function updateUI(kv) {
   // Synchronize parameter fields (turn/stop threshold) live
   syncParamField('p-turn', kv.Turn);
   syncParamField('p-stop', kv.Stop);
+  syncParamField('p-side', kv.Side);
+  syncParamField('p-turnfactor', kv.TF);
 
   // Distances
   ['m', 'l', 'r'].forEach(dir => {

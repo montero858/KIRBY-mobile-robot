@@ -166,19 +166,23 @@ void Robot::_registerWifiCallbacks() {
         }
     });
 
-    _wifi.onParameter([this](int turn, int stopCm) {
-        if (turn   > 0) _navigation.setTurnFrontThreshold(constrain(turn,   1, 400));
-        if (stopCm > 0) _navigation.setStopThreshold(constrain(stopCm, 1, 400));
+    _wifi.onParameter([this](int turn, int sideTurn, int turnFactor) {
+        if (turn       > 0) _navigation.setTurnFrontThreshold(constrain(turn,       1, 400));
+        if (sideTurn   > 0) _navigation.setSideTurnThreshold(constrain(sideTurn,   1, 400));
+        if (turnFactor >= 0) _navigation.setTurnFactor(constrain(turnFactor, 0, 100));
+        // turnFactor >= 0 statt > 0: 0 ist hier ein gueltiger Wert (schaerfste Kurve)
     });
 
     _wifi.onStatus([this]() -> String {
         return "State:"   + String((int)_state) +
-               " Turn:"   + String(_navigation.turnFrontThreshold()) +
-               " Stop:"   + String(_navigation.stopThreshold()) +
-               " Speed:"  + String(_navigation.maxSpeed()) +
-               " M:"      + String(_navigation.distanceCenter()) +
-               " L:"      + String(_navigation.distanceLeft()) +
-               " R:"      + String(_navigation.distanceRight()) +
-               " BTM:"    + String(_navigation.floor()    ? 1 : 0);
+            " Turn:"   + String(_navigation.turnFrontThreshold()) +
+            " Stop:"   + String(_navigation.stopThreshold()) +
+            " Side:"   + String(_navigation.sideTurnThreshold()) +
+            " TF:"     + String(_navigation.turnFactor()) +
+            " Speed:"  + String(_navigation.maxSpeed()) +
+            " M:"      + String(_navigation.distanceCenter()) +
+            " L:"      + String(_navigation.distanceLeft()) +
+            " R:"      + String(_navigation.distanceRight()) +
+            " BTM:"    + String(_navigation.floor()    ? 1 : 0);
     });
 }

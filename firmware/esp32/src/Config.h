@@ -72,9 +72,13 @@ namespace Config {
     namespace NavigationCfg {
         constexpr int     FRONT_TURN_THRESHOLD_CM   = 80;
         constexpr int     SIDE_TURN_THRESHOLD_CM    = 40;
-        constexpr int     STOP_THRESHOLD_CM         = 15;
+        constexpr int     STOP_THRESHOLD_SPD1_CM    = 15;
+        constexpr int     STOP_THRESHOLD_SPD2_CM    = 16;
+        constexpr int     STOP_THRESHOLD_SPD3_CM    = 18;
+        constexpr int     STOP_THRESHOLD_SPD4_CM    = 20;
         constexpr int     MARGIN_CM                 = 20;
-        constexpr uint8_t SPEED_MIN                 = 0;    // minimum for tight cornering
+        constexpr uint8_t TURN_FACTOR               = 50;  // how much to slow down the inner wheel during a turn (scaled by 100)
+//        constexpr uint8_t SPEED_MIN                 = 0;    // minimum for tight cornering
         constexpr uint8_t SPEED_SLOW                = 135;
         constexpr uint8_t SPEED_LEVEL_1             = 135;
         constexpr uint8_t SPEED_LEVEL_2             = 165;

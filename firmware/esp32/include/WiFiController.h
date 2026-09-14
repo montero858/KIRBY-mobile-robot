@@ -25,7 +25,7 @@ public:
     using VoidCb    = std::function<void()>;
     using IntCb     = std::function<void(int)>;
     using StringCb  = std::function<String()>;
-    using ParamCb   = std::function<void(int turn, int stop)>;
+    using ParamCb   = std::function<void(int turn, int sideTurn, int turnFactor)>;
 
     // --------------------------------------------------------
     //  Constructor

@@ -27,9 +27,13 @@ Navigation::Navigation(MotorDriver&      motor,
       _safetyDelay(NavigationCfg::SAFETY_DELAY_MS),
       _scanTurnTimeout(NavigationCfg::SCAN_TURN_TIMEOUT_MS),
       _turnFrontThreshold(NavigationCfg::FRONT_TURN_THRESHOLD_CM),
-      _stopThreshold(NavigationCfg::STOP_THRESHOLD_CM),
+      _turnSideThreshold(NavigationCfg::SIDE_TURN_THRESHOLD_CM),
+      _stopThreshold(NavigationCfg::STOP_THRESHOLD_SPD1_CM),
+      _turnFactor(NavigationCfg::TURN_FACTOR),
       _margin(NavigationCfg::MARGIN_CM)
 {
+    setMaxSpeed(_maxSpeed); // initialize _lastMaxSpeed 
+                            // and call _updateLimitsBasedOnSpeed()
 }
 
 // ============================================================
@@ -256,6 +260,34 @@ uint8_t Navigation::_calcSpeed(int distanceCm) const {
             _maxSpeed
         )
     );
+}
+
+void Navigation::_updateLimitsBasedOnSpeed(uint8_t speed) {
+    switch (speed) {
+        case NavigationCfg::SPEED_LEVEL_1:
+            _stopThreshold = NavigationCfg::STOP_THRESHOLD_SPD1_CM;
+            _turnFactor = NavigationCfg::TURN_FACTOR;
+            break;
+        case NavigationCfg::SPEED_LEVEL_2:
+            _stopThreshold = NavigationCfg::STOP_THRESHOLD_SPD2_CM;
+            _turnFactor = NavigationCfg::TURN_FACTOR - 10;   
+            break;
+        case NavigationCfg::SPEED_LEVEL_3:
+            _stopThreshold = NavigationCfg::STOP_THRESHOLD_SPD3_CM;
+            _turnFactor = NavigationCfg::TURN_FACTOR - 20;
+            break;
+        case NavigationCfg::SPEED_LEVEL_4:
+            _stopThreshold = NavigationCfg::STOP_THRESHOLD_SPD4_CM;
+            _turnFactor = NavigationCfg::TURN_FACTOR - 30;
+            
+            break;
+        default:
+            // Default values for unknown speed levels
+            _stopThreshold = NavigationCfg::STOP_THRESHOLD_SPD4_CM;
+            _turnFactor = NavigationCfg::TURN_FACTOR;
+
+        _innerSpeed = (speed * _turnFactor) / 100;
+    }
 }
 
 // ============================================================

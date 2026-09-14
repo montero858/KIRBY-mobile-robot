@@ -140,6 +140,8 @@ Speed reduces linearly between the `FRONT_TURN_THRESHOLD_CM` and the `STOP_THRES
 
 The safety delay after being lifted (`SAFETY_DELAY_MS`) always starts counting from the moment the robot is set back down, not from the moment it was picked up — so the wait is the same length regardless of how long it was held in the air.
 
+> **Calibration note:** Speed level 1 acts as the base calibration value. Selecting a higher speed level via the Web UI derives an adjusted `STOP_THRESHOLD_CM` from it automatically (higher speed → slightly larger stop distance), rather than using independent fixed values per level. This is a temporary tuning aid and is expected to be replaced once the robot's final speed/distance behaviour has been calibrated.
+
 ---
 
 ## Web Interface

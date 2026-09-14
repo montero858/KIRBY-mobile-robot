@@ -102,7 +102,13 @@ public:
     // --------------------------------------------------------
     //  Driving parameters (changeable via web UI)
     // --------------------------------------------------------
-    void    setMaxSpeed     (uint8_t v) { _maxSpeed      = constrain(v, 0, 255); }
+    void setMaxSpeed(uint8_t v) {
+        _maxSpeed = constrain(v, 0, 255);
+        if (_maxSpeed != _lastMaxSpeed) {
+            _lastMaxSpeed = _maxSpeed;
+            _updateLimitsBasedOnSpeed(_maxSpeed);
+        }
+    }
 
     // setTurnFrontThreshold()/setStopThreshold() make sure that
     // _turnFrontThreshold > _stopThreshold always holds, regardless of
@@ -116,10 +122,14 @@ public:
             _turnFrontThreshold = _stopThreshold + 1;
         }
     }
+    void    setSideTurnThreshold(int v)     { _turnSideThreshold = constrain(v, 1, 400); }
+    void    setTurnFactor(uint8_t v)        { _turnFactor = constrain(v, 0, 100); }
 
     uint8_t maxSpeed()      const { return _maxSpeed;      }
     int     turnFrontThreshold() const { return _turnFrontThreshold; }
     int     stopThreshold() const { return _stopThreshold; }
+    int     sideTurnThreshold() const { return _turnSideThreshold; }
+    uint8_t turnFactor()        const { return _turnFactor; }
 
 
     // --------------------------------------------------------
@@ -168,13 +178,20 @@ private:
     // ---------------------------------------------------------
 
     uint8_t _maxSpeed;
+    uint8_t _lastMaxSpeed = 0;   // fuer setMaxSpeed(): erkennt echte Aenderungen,
+                             // damit _updateLimitsBasedOnSpeed() nur bei
+                             // Bedarf laeuft, statt bei jedem _calcSpeed()-Aufruf
     uint16_t _reverseDuration;
     uint16_t _safetyDelay;
     uint16_t _scanTurnTimeout;
 
     int _turnFrontThreshold;
+    int _turnSideThreshold;
     int _stopThreshold;
     int _margin;
+    int _innerSpeed;  // speed of the inner wheel during a turn
+
+    float _turnFactor;
 
 
     // ---------------------------------------------------------
@@ -233,6 +250,7 @@ private:
      */
     uint8_t _calcSpeed(int distanceCm) const;
 
+    void _updateLimitsBasedOnSpeed(uint8_t speed);
 
     // ---------------------------------------------------------
     // State / timing helpers
