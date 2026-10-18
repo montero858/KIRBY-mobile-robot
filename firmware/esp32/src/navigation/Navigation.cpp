@@ -23,13 +23,13 @@ Navigation::Navigation(MotorDriver&      motor,
       _irFloor(irFloor),
       _displayCb(nullptr),
       _maxSpeed(NavigationCfg::SPEED_LEVEL_1),
-      _reverseDuration(NavigationCfg::REVERSE_DURATION_MS),
+      _reverseDuration(NavigationCfg::REV_DURATION_SPD1_MS),
       _safetyDelay(NavigationCfg::SAFETY_DELAY_MS),
       _scanTurnTimeout(NavigationCfg::SCAN_TURN_TIMEOUT_MS),
-      _turnFrontThreshold(NavigationCfg::FRONT_TURN_THRESHOLD_CM),
-      _turnSideThreshold(NavigationCfg::SIDE_TURN_THRESHOLD_CM),
-      _stopThreshold(NavigationCfg::STOP_THRESHOLD_SPD1_CM),
-      _turnFactor(NavigationCfg::TURN_FACTOR),
+      _turnFrontThreshold(NavigationCfg::FRONT_TURN_THRSHLD_SPD1_CM),
+      _turnSideThreshold(NavigationCfg::SIDE_TURN_THRSHLD_SPD1_CM),
+      _stopThreshold(NavigationCfg::STOP_THRSHLD_SPD1_CM),
+      _turnFactor(NavigationCfg::TURN_FACTOR_SPD1),
       _margin(NavigationCfg::MARGIN_CM)
 {
     setMaxSpeed(_maxSpeed); // initialize _lastMaxSpeed 
@@ -63,7 +63,7 @@ void Navigation::update() {
         _lastSensorUpdate = millis();
     }
 
-    if (_sensors.floor) {
+    if (_sensors.floor && NavigationCfg::EMERGENCY_STOP_ENABLED) {
         // Robot has been lifted: stop immediately, state EMERGENCY_STOP.
         // The recovery timer is deliberately NOT started yet - that
         // happens in _updateEmergencyStop() only once the floor is
@@ -121,17 +121,48 @@ void Navigation::_updateSensors() {
 
 void Navigation::_updateDriving() {
 
+    uint8_t speed = _calcSpeed(_sensors.center);
+
+    // Signed on purpose: a negative _turnFactor means the inner wheel
+    // should turn backwards instead of just slower, for a tighter turn.
+    // MotorDriver::curveLeft()/curveRight() take a signed innerSpeed,
+    // so this is passed straight through.
+    int16_t innerSpeed = (int16_t)speed * _turnFactor / 100;
+
+
     if (_sensors.center <= _stopThreshold || 
         _sensors.left <= _stopThreshold || 
         _sensors.right <= _stopThreshold) {
         _startBlockedReverse();
         return;
     }
-
-    uint8_t speed =
-        _calcSpeed(_sensors.center);
-
-    _motor.forward(speed);
+    
+    if (_sensors.center <= _turnFrontThreshold) {
+        if (_sensors.left > _sensors.right) {
+            _motor.curveLeft(speed, innerSpeed);
+        }
+        else if (_sensors.right > _sensors.left) {
+            _motor.curveRight(speed, innerSpeed);
+        }
+        else {
+            // Both directions are equally blocked, 
+            //choose a default direction
+            _motor.curveRight(speed, innerSpeed);
+        }
+        return;
+    } 
+    else if (_sensors.left <= _turnSideThreshold) {
+        _motor.curveRight(speed, innerSpeed);
+        return;
+    } 
+    else if (_sensors.right <= _turnSideThreshold) {
+        _motor.curveLeft(speed, innerSpeed);
+        return;
+    }
+    else {
+        // Path is clear: drive straight
+        _motor.forward(speed);
+    }
 }
 
 // ============================================================
@@ -159,10 +190,10 @@ void Navigation::_updateBlockedReverse() {
 void Navigation::_startBlockedScanAndTurn() {
  
     if (_sensors.left > _sensors.right) {
-        _motor.turnRight(_maxSpeed);
+        _motor.turnLeft(_maxSpeed);
     }
     else if (_sensors.right > _sensors.left) {
-        _motor.turnLeft(_maxSpeed);
+        _motor.turnRight(_maxSpeed);
     }
     else {
         // Both directions are equally blocked, 
@@ -231,13 +262,13 @@ uint8_t Navigation::_calcSpeed(int distanceCm) const {
     // otherwise incorrectly result in full speed); instead treat it
     // safely like a near/uncertain distance -> slow driving.
     if (distanceCm == UltrasonicSensor::INVALID_DISTANCE)
-        return NavigationCfg::SPEED_SLOW;
+        return NavigationCfg::SPEED_LEVEL_1;
 
     if (distanceCm >= _turnFrontThreshold)
         return _maxSpeed;
 
     if (distanceCm <= _stopThreshold)
-        return NavigationCfg::SPEED_SLOW;
+        return NavigationCfg::SPEED_LEVEL_1;
 
     const int range =
         _turnFrontThreshold - _stopThreshold;
@@ -246,47 +277,58 @@ uint8_t Navigation::_calcSpeed(int distanceCm) const {
         distanceCm - _stopThreshold;
 
     int speed =
-        NavigationCfg::SPEED_SLOW +
+        NavigationCfg::SPEED_LEVEL_1 +
         (
             (_maxSpeed -
-             NavigationCfg::SPEED_SLOW)
+             NavigationCfg::SPEED_LEVEL_1)
             * offset
         ) / range;
 
     return static_cast<uint8_t>(
         constrain(
             speed,
-            NavigationCfg::SPEED_SLOW,
+            NavigationCfg::SPEED_LEVEL_1,
             _maxSpeed
         )
     );
 }
 
 void Navigation::_updateLimitsBasedOnSpeed(uint8_t speed) {
+    
     switch (speed) {
         case NavigationCfg::SPEED_LEVEL_1:
-            _stopThreshold = NavigationCfg::STOP_THRESHOLD_SPD1_CM;
-            _turnFactor = NavigationCfg::TURN_FACTOR;
+            _turnFrontThreshold = NavigationCfg::FRONT_TURN_THRSHLD_SPD1_CM;
+            _turnSideThreshold  = NavigationCfg::SIDE_TURN_THRSHLD_SPD1_CM;
+            _stopThreshold      = NavigationCfg::STOP_THRSHLD_SPD1_CM;
+            _turnFactor         = NavigationCfg::TURN_FACTOR_SPD1;
+            _reverseDuration    = NavigationCfg::REV_DURATION_SPD1_MS;
             break;
         case NavigationCfg::SPEED_LEVEL_2:
-            _stopThreshold = NavigationCfg::STOP_THRESHOLD_SPD2_CM;
-            _turnFactor = NavigationCfg::TURN_FACTOR - 10;   
+            _turnFrontThreshold = NavigationCfg::FRONT_TURN_THRSHLD_SPD2_CM;
+            _turnSideThreshold  = NavigationCfg::SIDE_TURN_THRSHLD_SPD2_CM;
+            _stopThreshold      = NavigationCfg::STOP_THRSHLD_SPD2_CM;
+            _turnFactor         = NavigationCfg::TURN_FACTOR_SPD2;
+            _reverseDuration    = NavigationCfg::REV_DURATION_SPD2_MS;
             break;
         case NavigationCfg::SPEED_LEVEL_3:
-            _stopThreshold = NavigationCfg::STOP_THRESHOLD_SPD3_CM;
-            _turnFactor = NavigationCfg::TURN_FACTOR - 20;
-            break;
-        case NavigationCfg::SPEED_LEVEL_4:
-            _stopThreshold = NavigationCfg::STOP_THRESHOLD_SPD4_CM;
-            _turnFactor = NavigationCfg::TURN_FACTOR - 30;
-            
+            _turnFrontThreshold = NavigationCfg::FRONT_TURN_THRSHLD_SPD3_CM;
+            _turnSideThreshold  = NavigationCfg::SIDE_TURN_THRSHLD_SPD3_CM;
+            _stopThreshold      = NavigationCfg::STOP_THRSHLD_SPD3_CM;
+            _turnFactor         = NavigationCfg::TURN_FACTOR_SPD3;
+            _reverseDuration    = NavigationCfg::REV_DURATION_SPD3_MS;
             break;
         default:
-            // Default values for unknown speed levels
-            _stopThreshold = NavigationCfg::STOP_THRESHOLD_SPD4_CM;
-            _turnFactor = NavigationCfg::TURN_FACTOR;
-
-        _innerSpeed = (speed * _turnFactor) / 100;
+            // Default values for unknown speed levels (maximum safety)
+            _turnFrontThreshold = NavigationCfg::FRONT_TURN_THRSHLD_SPD3_CM;
+            _turnSideThreshold  = NavigationCfg::SIDE_TURN_THRSHLD_SPD3_CM;
+            _stopThreshold      = NavigationCfg::STOP_THRSHLD_SPD3_CM;
+            _turnFactor         = NavigationCfg::TURN_FACTOR_SPD3;
+            _reverseDuration    = NavigationCfg::REV_DURATION_SPD3_MS;
+            break;
+    }
+    
+    if (_turnFrontThreshold <= _stopThreshold) {
+        _turnFrontThreshold = _stopThreshold + 1;
     }
 }
 

@@ -158,19 +158,25 @@ void Robot::_registerWifiCallbacks() {
         const uint8_t speeds[] = {
             Config::NavigationCfg::SPEED_LEVEL_1,
             Config::NavigationCfg::SPEED_LEVEL_2,
-            Config::NavigationCfg::SPEED_LEVEL_3,
-            Config::NavigationCfg::SPEED_LEVEL_4
+            Config::NavigationCfg::SPEED_LEVEL_3
         };
-        if (stufe >= 1 && stufe <= 4) {
+        if (stufe >= 1 && stufe <= 3) {
             _navigation.setMaxSpeed(speeds[stufe - 1]);
         }
     });
 
-    _wifi.onParameter([this](int turn, int sideTurn, int turnFactor) {
-        if (turn       > 0) _navigation.setTurnFrontThreshold(constrain(turn,       1, 400));
-        if (sideTurn   > 0) _navigation.setSideTurnThreshold(constrain(sideTurn,   1, 400));
-        if (turnFactor >= 0) _navigation.setTurnFactor(constrain(turnFactor, 0, 100));
-        // turnFactor >= 0 statt > 0: 0 ist hier ein gueltiger Wert (schaerfste Kurve)
+    _wifi.onParameter([this](int turn, int sideTurn, int stop,
+                              int turnFactor, int reverseDuration) {
+        if (turn            != WiFiController::PARAM_UNSET)
+            _navigation.setTurnFrontThreshold(constrain(turn, 1, 400));
+        if (sideTurn        != WiFiController::PARAM_UNSET)
+            _navigation.setSideTurnThreshold(constrain(sideTurn, 1, 400));
+        if (stop            != WiFiController::PARAM_UNSET)
+            _navigation.setStopThreshold(constrain(stop, 1, 400));
+        if (turnFactor      != WiFiController::PARAM_UNSET)
+            _navigation.setTurnFactor(constrain(turnFactor, -100, 100));
+        if (reverseDuration != WiFiController::PARAM_UNSET)
+            _navigation.setReverseDuration(constrain(reverseDuration, 50, 5000));
     });
 
     _wifi.onStatus([this]() -> String {
@@ -179,6 +185,7 @@ void Robot::_registerWifiCallbacks() {
             " Stop:"   + String(_navigation.stopThreshold()) +
             " Side:"   + String(_navigation.sideTurnThreshold()) +
             " TF:"     + String(_navigation.turnFactor()) +
+            " Rev:"    + String(_navigation.reverseDuration()) +
             " Speed:"  + String(_navigation.maxSpeed()) +
             " M:"      + String(_navigation.distanceCenter()) +
             " L:"      + String(_navigation.distanceLeft()) +

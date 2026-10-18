@@ -144,7 +144,7 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
   /* ── Speed levels ── */
   .speed-btns {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 8px;
     width: 100%;
     max-width: 360px;
@@ -349,7 +349,6 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
       <button class="speed-btn aktiv" id="s1" onclick="setzeStufe(1)">1</button>
       <button class="speed-btn"       id="s2" onclick="setzeStufe(2)">2</button>
       <button class="speed-btn"       id="s3" onclick="setzeStufe(3)">3</button>
-      <button class="speed-btn"       id="s4" onclick="setzeStufe(4)">4</button>
     </div>
 
     <!-- Parameters -->
@@ -357,11 +356,11 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
     <div class="card">
       <div class="param-row">
         <span class="param-label">Turn-Schwelle (cm)</span>
-        <input type="number" id="p-turn" min="1" max="400">
+        <input type="number" id="p-turn" min="-400" max="400">
       </div>
       <div class="param-row">
         <span class="param-label">Stop-Schwelle (cm)</span>
-        <input type="number" id="p-stop" min="1" max="400" readonly disabled>
+        <input type="number" id="p-stop" min="1" max="400">
       </div>
       <div class="param-row">
         <span class="param-label">Seiten-Schwelle (cm)</span>
@@ -369,7 +368,11 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
       </div>
       <div class="param-row">
         <span class="param-label">Kurvenfaktor (%)</span>
-        <input type="number" id="p-turnfactor" min="0" max="100">
+        <input type="number" id="p-turnfactor" min="-100" max="100">
+      </div>
+      <div class="param-row">
+        <span class="param-label">Rückwärts-Dauer (ms)</span>
+        <input type="number" id="p-rev" min="50" max="5000" step="50">
       </div>
     </div>
     <button class="btn btn-param" onclick="paramSenden()">↺ Parameter übernehmen</button>
@@ -404,7 +407,7 @@ async function sende(pfad) {
 async function setzeStufe(n) {
   try {
     await fetch('/stufe?n=' + n);
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 3; i++) {
       $('s' + i).classList.toggle('aktiv', i === n);
     }
     feedback('Stufe ' + n + ' aktiv', '#1D9E75');
@@ -418,9 +421,11 @@ async function setzeStufe(n) {
 async function paramSenden() {
   const turn       = $('p-turn').value;
   const side       = $('p-side').value;
+  const stop       = $('p-stop').value;
   const turnFactor = $('p-turnfactor').value;
+  const revDur     = $('p-rev').value;
   try {
-    await fetch(`/parameter?turn=${turn}&sideTurn=${side}&turnFactor=${turnFactor}`);
+    await fetch(`/parameter?turn=${turn}&sideTurn=${side}&stop=${stop}&turnFactor=${turnFactor}&revDuration=${revDur}`);
     feedback('Parameter gespeichert', '#1D9E75');
   } catch(e) {
     feedback('Fehler: ' + e, '#E24B4A');
@@ -480,6 +485,7 @@ function updateUI(kv) {
   syncParamField('p-stop', kv.Stop);
   syncParamField('p-side', kv.Side);
   syncParamField('p-turnfactor', kv.TF);
+  syncParamField('p-rev', kv.Rev);
 
   // Distances
   ['m', 'l', 'r'].forEach(dir => {
@@ -493,10 +499,10 @@ function updateUI(kv) {
 
   // Determine active level
   const speed = kv.Speed;
-  const levels = [135, 165, 195, 225];
+  const levels = [135, 180, 225];
   const activeLevel = levels.indexOf(speed) + 1;
   if (activeLevel > 0) {
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 3; i++) {
       $('s' + i).classList.toggle('aktiv', i === activeLevel);
     }
   }

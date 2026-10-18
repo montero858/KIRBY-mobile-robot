@@ -58,10 +58,12 @@ public:
     void turnRight(uint8_t speed);
 
     // Curved drive (outer wheel faster than inner wheel)
-    // outerSpeed: speed of the outer wheel (0–255)
-    // innerSpeed: speed of the inner wheel (0–255)
-    void curveLeft(uint8_t outerSpeed, uint8_t innerSpeed);
-    void curveRight(uint8_t outerSpeed, uint8_t innerSpeed);
+    // outerSpeed: speed of the outer wheel (-255 to +255)
+    // innerSpeed: speed of the inner wheel (-255 to +255)
+    //   Normally positive (slower than outer); negative reverses the
+    //   inner wheel for a tighter turn.
+    void curveLeft(int16_t outerSpeed, int16_t innerSpeed);
+    void curveRight(int16_t outerSpeed, int16_t innerSpeed);
 
     // Query current target values
     int getSpeedA() const { return _lastSpeedA; }

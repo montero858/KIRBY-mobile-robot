@@ -25,7 +25,13 @@ public:
     using VoidCb    = std::function<void()>;
     using IntCb     = std::function<void(int)>;
     using StringCb  = std::function<String()>;
-    using ParamCb   = std::function<void(int turn, int sideTurn, int turnFactor)>;
+    using ParamCb   = std::function<void(int turn, int sideTurn, int stop,
+                                          int turnFactor, int reverseDuration)>;
+
+    // Sentinel for "parameter not sent in this request". Chosen far
+    // outside any valid range (turnFactor is -100..100, thresholds and
+    // reverseDuration are positive) so it can never be a real value.
+    static constexpr int PARAM_UNSET = -32768;
 
     // --------------------------------------------------------
     //  Constructor

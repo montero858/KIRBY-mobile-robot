@@ -98,22 +98,24 @@ void MotorDriver::backward(uint8_t speed) {
     setMotors(-(int)speed, -(int)speed);
 }
 
-void MotorDriver::turnLeft(uint8_t speed) {
+void MotorDriver::turnRight(uint8_t speed) {
     // Pivot turn left: left wheel backward, right wheel forward
     setMotors(-(int)speed, (int)speed);
 }
 
-void MotorDriver::turnRight(uint8_t speed) {
+void MotorDriver::turnLeft(uint8_t speed) {
     // Pivot turn right: left wheel forward, right wheel backward
     setMotors((int)speed, -(int)speed);
 }
 
-void MotorDriver::curveLeft(uint8_t outerSpeed, uint8_t innerSpeed) {
-    // Curve left: right wheel outer (fast), left wheel inner (slow)
+void MotorDriver::curveRight(int16_t outerSpeed, int16_t innerSpeed) {
+    // Curve right: right wheel outer (fast), left wheel inner
+    // (slower, or reversed if innerSpeed is negative)
     setMotors((int)innerSpeed, (int)outerSpeed);
 }
 
-void MotorDriver::curveRight(uint8_t outerSpeed, uint8_t innerSpeed) {
-    // Curve right: left wheel outer (fast), right wheel inner (slow)
+void MotorDriver::curveLeft(int16_t outerSpeed, int16_t innerSpeed) {
+    // Curve left: left wheel outer (fast), right wheel inner
+    // (slower, or reversed if innerSpeed is negative)
     setMotors((int)outerSpeed, (int)innerSpeed);
 }

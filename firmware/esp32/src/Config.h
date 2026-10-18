@@ -40,7 +40,7 @@ namespace Config {
         constexpr uint8_t  ECHO_LEFT        = 25;
         constexpr uint8_t  TRIG_RIGHT       = 33;
         constexpr uint8_t  ECHO_RIGHT       = 32;
-        constexpr int      MAX_DISTANCE_CM  = 400;
+        constexpr int      MAX_DISTANCE_CM  = 200;
         constexpr uint16_t SAMPLE_DELAY_MS  = 20;
     }
 
@@ -70,23 +70,35 @@ namespace Config {
     //  with the Navigation class.
     // --------------------------------------------------------
     namespace NavigationCfg {
-        constexpr int     FRONT_TURN_THRESHOLD_CM   = 80;
-        constexpr int     SIDE_TURN_THRESHOLD_CM    = 40;
-        constexpr int     STOP_THRESHOLD_SPD1_CM    = 15;
-        constexpr int     STOP_THRESHOLD_SPD2_CM    = 16;
-        constexpr int     STOP_THRESHOLD_SPD3_CM    = 18;
-        constexpr int     STOP_THRESHOLD_SPD4_CM    = 20;
-        constexpr int     MARGIN_CM                 = 20;
-        constexpr uint8_t TURN_FACTOR               = 50;  // how much to slow down the inner wheel during a turn (scaled by 100)
-//        constexpr uint8_t SPEED_MIN                 = 0;    // minimum for tight cornering
-        constexpr uint8_t SPEED_SLOW                = 135;
-        constexpr uint8_t SPEED_LEVEL_1             = 135;
-        constexpr uint8_t SPEED_LEVEL_2             = 165;
-        constexpr uint8_t SPEED_LEVEL_3             = 195;
-        constexpr uint8_t SPEED_LEVEL_4             = 225;
-        constexpr uint16_t REVERSE_DURATION_MS      = 500;
-        constexpr uint16_t SAFETY_DELAY_MS          = 2000;
-        constexpr uint16_t SCAN_TURN_TIMEOUT_MS     = 5000;   // max. turn time before backing up again
+        constexpr uint8_t FRONT_TURN_THRSHLD_SPD1_CM = 50; 
+        constexpr uint8_t FRONT_TURN_THRSHLD_SPD2_CM = 65;
+        constexpr uint8_t FRONT_TURN_THRSHLD_SPD3_CM = 70;
+        
+        constexpr uint8_t SIDE_TURN_THRSHLD_SPD1_CM  = 40;
+        constexpr uint8_t SIDE_TURN_THRSHLD_SPD2_CM  = 45;
+        constexpr uint8_t SIDE_TURN_THRSHLD_SPD3_CM  = 45;
+
+        constexpr uint8_t STOP_THRSHLD_SPD1_CM       = 15;
+        constexpr uint8_t STOP_THRSHLD_SPD2_CM       = 17; 
+        constexpr uint8_t STOP_THRSHLD_SPD3_CM       = 18;
+        
+        constexpr uint8_t MARGIN_CM                  = 20;
+        
+        constexpr int8_t TURN_FACTOR_SPD1            = 10; 
+        constexpr int8_t TURN_FACTOR_SPD2            = 5; 
+        constexpr int8_t TURN_FACTOR_SPD3            = 1;  
+
+        constexpr uint8_t SPEED_LEVEL_1              = 165; 
+        constexpr uint8_t SPEED_LEVEL_2              = 205;
+        constexpr uint8_t SPEED_LEVEL_3              = 245;
+        
+        constexpr uint16_t REV_DURATION_SPD1_MS      = 400; 
+        constexpr uint16_t REV_DURATION_SPD2_MS      = 350; 
+        constexpr uint16_t REV_DURATION_SPD3_MS      = 300;
+
+        constexpr bool     EMERGENCY_STOP_ENABLED    = false;  // set to true to enable emergency stop when lifted
+        constexpr uint16_t SAFETY_DELAY_MS           = 2000;
+        constexpr uint16_t SCAN_TURN_TIMEOUT_MS      = 5000;   // max. turn time before backing up again
     }
 
     // --------------------------------------------------------

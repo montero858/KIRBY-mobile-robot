@@ -35,20 +35,18 @@ public:
         EMERGENCY_STOP
     };
 
-
     // ---------------------------------------------------------
     // Sensor snapshot
     // ---------------------------------------------------------
 
     struct SensorSnapshot
     {
-        int center = 999;
-        int left   = 999;
-        int right  = 999;
+        int center = UltrasonicSensor::INVALID_DISTANCE;
+        int left   = UltrasonicSensor::INVALID_DISTANCE;
+        int right  = UltrasonicSensor::INVALID_DISTANCE;
 
         bool floor = false;
     };
-
 
     // ---------------------------------------------------------
     // Constructor
@@ -69,26 +67,15 @@ public:
     // Main control
     // ---------------------------------------------------------
 
-    /**
-     * Must be called continuously from Robot::update().
-     *
-     * The method is deliberately non-blocking:
-     * no delay() based navigation logic is used here.
-     */
+    // The method is deliberately non-blocking:
+    // no delay() based navigation logic is used here
     void update();
 
-
-    /**
-     * Start autonomous navigation.
-     */
+    // Start autonomous navigation
     void start();
 
-
-    /**
-     * Stop autonomous navigation immediately.
-     */
+    // Stop autonomous navigation immediately
     void stop();
-
 
     // ---------------------------------------------------------
     // State information
@@ -98,10 +85,10 @@ public:
 
     const SensorSnapshot& sensors() const;
 
-
     // --------------------------------------------------------
     //  Driving parameters (changeable via web UI)
     // --------------------------------------------------------
+
     void setMaxSpeed(uint8_t v) {
         _maxSpeed = constrain(v, 0, 255);
         if (_maxSpeed != _lastMaxSpeed) {
@@ -123,14 +110,21 @@ public:
         }
     }
     void    setSideTurnThreshold(int v)     { _turnSideThreshold = constrain(v, 1, 400); }
-    void    setTurnFactor(uint8_t v)        { _turnFactor = constrain(v, 0, 100); }
+
+    // Negative values are allowed: the inner (curve-side) wheel then
+    // turns backwards instead of just slower/stopped, for a tighter turn.
+    void    setTurnFactor(int v)            { _turnFactor = constrain(v, -100, 100); }
+
+    // Duration of the initial backward move after an obstacle is
+    // detected (BLOCKED_REVERSE state), in ms.
+    void    setReverseDuration(uint16_t v)  { _reverseDuration = constrain(v, 50, 5000); }
 
     uint8_t maxSpeed()      const { return _maxSpeed;      }
     int     turnFrontThreshold() const { return _turnFrontThreshold; }
     int     stopThreshold() const { return _stopThreshold; }
     int     sideTurnThreshold() const { return _turnSideThreshold; }
-    uint8_t turnFactor()        const { return _turnFactor; }
-
+    int8_t  turnFactor()        const { return _turnFactor; }
+    uint16_t reverseDuration()  const { return _reverseDuration; }
 
     // --------------------------------------------------------
     //  Sensor values (for the /status web endpoint)
@@ -164,14 +158,11 @@ private:
 
     SensorSnapshot _sensors;
 
-
     // ---------------------------------------------------------
     // Navigation state
     // ---------------------------------------------------------
 
     State _state = State::DRIVING;
-
-
 
     // ---------------------------------------------------------
     // Runtime parameters
@@ -189,10 +180,9 @@ private:
     int _turnSideThreshold;
     int _stopThreshold;
     int _margin;
-    int _innerSpeed;  // speed of the inner wheel during a turn
 
-    float _turnFactor;
-
+    // Signed: negative -> inner wheel of a curve turns backwards.
+    int8_t _turnFactor;
 
     // ---------------------------------------------------------
     // Timing
@@ -208,16 +198,12 @@ private:
     // down again, regardless of how long it was in the air before.
     bool _emergencyRecoveryArmed = false;
 
-
     // ---------------------------------------------------------
     // Sensor handling
     // ---------------------------------------------------------
 
-    /**
-     * Read all navigation sensors and update _sensors.
-     */
+    // Read all navigation sensors and update _sensors
     void _updateSensors();
-
 
     // ---------------------------------------------------------
     // State handlers
@@ -228,26 +214,20 @@ private:
     void _updateBlockedScanAndTurn();
     void _updateEmergencyStop();
 
-
     // ---------------------------------------------------------
     // Avoidance
     // ---------------------------------------------------------
 
-    /**
-     * Start the normal obstacle avoidance sequence.
-     */
+    // Start the normal obstacle avoidance sequence
     void _startBlockedReverse();
     void _startBlockedScanAndTurn();
-
    
     // ---------------------------------------------------------
     // Motion
     // ---------------------------------------------------------
 
-    /**
-     * Calculate a speed depending on the distance
-     * to the obstacle.
-     */
+    // Calculate a speed depending on the distance
+    // to the obstacle
     uint8_t _calcSpeed(int distanceCm) const;
 
     void _updateLimitsBasedOnSpeed(uint8_t speed);
@@ -256,16 +236,11 @@ private:
     // State / timing helpers
     // ---------------------------------------------------------
 
-    /**
-     * Change state and reset the state timer.
-     */
+    // Change state and reset the state timer
     void _transitionTo(State next);
 
-
-    /**
-     * Check whether the current state has been active
-     * for at least the specified amount of time.
-     */
+    // Check whether the current state has been active
+    // for at least the specified amount of time
     bool _stateElapsed(unsigned long duration) const;
 
     void _display(const String& text);
