@@ -5,12 +5,10 @@
 //  to GET /.
 //
 //  Endpoints used by the interface:
-//    GET  /start
-//    GET  /stopp
-//    GET  /stufe?n=1..4
-//    GET  /parameter?turn=X&stop=Y
-//    GET  /status   → "State:N Turn:N Stop:N Speed:N
-//                       M:N L:N R:N BTM:N"
+//    GET  /stufe?n=1..3
+//    GET  /parameter?turn=&sideTurn=&stop=&turnFactor=&revDuration=
+//    GET  /status   → "State:N Turn:N Stop:N Side:N TF:N Rev:N
+//                       Speed:N Lvl:N M:N L:N R:N BTM:N"
 // ============================================================
 
 #pragma once
@@ -356,7 +354,7 @@ static const char HTML_SEITE[] PROGMEM = R"rawliteral(
     <div class="card">
       <div class="param-row">
         <span class="param-label">Turn-Schwelle (cm)</span>
-        <input type="number" id="p-turn" min="-400" max="400">
+        <input type="number" id="p-turn" min="1" max="400">
       </div>
       <div class="param-row">
         <span class="param-label">Stop-Schwelle (cm)</span>
@@ -433,7 +431,7 @@ async function paramSenden() {
 }
 
 // ── Status parser ────────────────────────────────────────────
-// Expects: "State:N Turn:N Stop:N Speed:N M:N L:N R:N BTM:N"
+// Expects: "State:N Turn:N Stop:N Side:N TF:N Rev:N Speed:N Lvl:N M:N L:N R:N BTM:N"
 
 // Robot::State only knows INIT(0) / READY(1) / RUN(2) – see Robot.h.
 // A fourth entry would never be reachable here and has been removed.
@@ -499,7 +497,7 @@ function updateUI(kv) {
 
   // Determine active level
   const speed = kv.Speed;
-  const levels = [135, 180, 225];
+  const levels = [165, 205, 245];
   const activeLevel = levels.indexOf(speed) + 1;
   if (activeLevel > 0) {
     for (let i = 1; i <= 3; i++) {

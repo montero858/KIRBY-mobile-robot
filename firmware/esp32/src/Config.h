@@ -45,7 +45,7 @@ namespace Config {
     }
 
     // --------------------------------------------------------
-    //  IR sensors TCRT5000 – side A (VIN, input-only pins)
+    //  IR sensor TCRT5000 – side B (3V3)
     // --------------------------------------------------------
     namespace Ir {
         constexpr uint8_t  IR_FLOOR          = 13;

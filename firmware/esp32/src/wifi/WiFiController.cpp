@@ -66,8 +66,8 @@ void WiFiController::_setupRoutes() {
             return;
         }
         int stufe = _server.arg("n").toInt();
-        if (stufe < 1 || stufe > 4) {
-            _server.send(400, "text/plain", "Ungueltige Stufe (1-4)");
+        if (stufe < 1 || stufe > 3) {
+            _server.send(400, "text/plain", "Ungueltige Stufe (1-3)");
             return;
         }
         if (_cbStufe) _cbStufe(stufe);
