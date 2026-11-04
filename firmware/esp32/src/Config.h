@@ -89,12 +89,12 @@ namespace Config {
         constexpr int8_t TURN_FACTOR_SPD3            = 1;  
 
         constexpr uint8_t SPEED_LEVEL_1              = 165; 
-        constexpr uint8_t SPEED_LEVEL_2              = 205;
-        constexpr uint8_t SPEED_LEVEL_3              = 245;
+        constexpr uint8_t SPEED_LEVEL_2              = 205;     // ~24% more than level 1
+        constexpr uint8_t SPEED_LEVEL_3              = 245;     // ~20% more than level 2
         
         constexpr uint16_t REV_DURATION_SPD1_MS      = 400; 
-        constexpr uint16_t REV_DURATION_SPD2_MS      = 350; 
-        constexpr uint16_t REV_DURATION_SPD3_MS      = 300;
+        constexpr uint16_t REV_DURATION_SPD2_MS      = 304;     // ~24% less than level 1 
+        constexpr uint16_t REV_DURATION_SPD3_MS      = 243;     // ~20% less than level 2
 
         constexpr bool     EMERGENCY_STOP_ENABLED    = false;  // set to true to enable emergency stop when lifted
         constexpr uint16_t SAFETY_DELAY_MS           = 2000;
